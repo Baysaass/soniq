@@ -3,7 +3,7 @@ import './globals.css'
 import { LangProvider } from '@/lib/i18n'
 
 export const metadata: Metadata = {
-  title: 'Soniq — See your sound',
+  title: 'SFX Extension',
   description:
     'Soniq is an audio-reactive motion toolkit for After Effects and Premiere Pro. Beat-synced keyframes, live waveforms and 120 visualizer presets.',
   keywords: [
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     'motion graphics',
   ],
   openGraph: {
-    title: 'Soniq — See your sound',
+    title: 'SFX Extension',
     description:
       'Audio-reactive motion toolkit for After Effects and Premiere Pro. Beat-synced keyframes, live waveforms, 120 visualizer presets.',
     type: 'website',
