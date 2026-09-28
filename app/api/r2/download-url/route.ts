@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getStoreSettings } from '@/lib/settings-db'
-import { getOrderById } from '@/lib/orders-db'
+import { db } from '@/lib/db'
 import { isR2Configured, generatePresignedDownloadUrl } from '@/lib/r2-client'
 
 export async function POST(request: Request) {
@@ -12,19 +11,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File key шаардлагатай.' }, { status: 400 })
     }
 
-    const settings = getStoreSettings()
-
-    // Verification check: Either admin passcode is valid, or order is approved
-    let isAuthorized = false
-
-    if (passcode && passcode === settings.adminPasscode) {
-      isAuthorized = true
-    } else if (orderId) {
-      const order = getOrderById(orderId)
-      if (order && order.status === 'APPROVED') {
-        isAuthorized = true
-      }
-    }
+    const isAuthorized =
+      (passcode && (await db.verifyAdminPasscode(passcode))) ||
+      (orderId && (await db.getOrderById(orderId))?.status === 'APPROVED')
 
     if (!isAuthorized) {
       return NextResponse.json(

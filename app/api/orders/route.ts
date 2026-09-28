@@ -13,17 +13,64 @@ export async function POST(request: Request) {
       )
     }
 
+    // Enrich items with fresh product download metadata from DB
+    const enrichedItems = await Promise.all(
+      (items as any[]).map(async (item) => {
+        try {
+          const product = await db.getProductById(item.id)
+          if (product) {
+            return {
+              ...item,
+              title: product.title || item.title,
+              price: item.price ?? product.priceMNT,
+              priceUSD: item.priceUSD ?? product.priceUSD,
+              image: product.image || item.image,
+              weTransferLink: product.defaultWeTransferLink || item.weTransferLink || '',
+              r2Key: product.r2Key || item.r2Key || '',
+            }
+          }
+        } catch (e) {
+          console.warn('Could not fetch product for item enrichment:', item.id)
+        }
+        return item
+      })
+    )
+
+    // Resolve primary download link (WeTransfer / R2)
+    let orderWeTransferLink = ''
+    let orderR2Key = ''
+
+    for (const it of enrichedItems) {
+      if (it.weTransferLink && !orderWeTransferLink) {
+        orderWeTransferLink = it.weTransferLink
+      }
+      if (it.r2Key && !orderR2Key) {
+        orderR2Key = it.r2Key
+      }
+    }
+
+    if (!orderWeTransferLink) {
+      try {
+        const settings = await db.getSettings()
+        orderWeTransferLink = settings?.defaultBundleWeTransfer || ''
+      } catch (e) {
+        // ignore
+      }
+    }
+
     const order = await db.createOrder({
       customerName,
       customerEmail,
       customerPhone,
       customerNotes,
       receiptNote,
-      items,
+      items: enrichedItems,
       totalAmountMNT: totalAmountMNT || 0,
       totalAmountUSD: totalAmountUSD || 0,
       currency: currency || 'MNT',
       paymentMethod: paymentMethod || 'KHAN_BANK',
+      weTransferLink: orderWeTransferLink,
+      r2Key: orderR2Key,
     })
 
     return NextResponse.json({

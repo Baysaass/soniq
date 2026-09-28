@@ -35,6 +35,8 @@ import {
   KeyRound,
   ShieldCheck,
   LogOut,
+  Mail,
+  Send,
 } from 'lucide-react'
 import { STORE_SETTINGS, StoreProduct } from '@/lib/store-data'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
@@ -95,6 +97,13 @@ export default function AdminPage() {
   const [approving, setApproving] = useState(false)
   const [orderFilterStatus, setOrderFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL')
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
+  const [sendEmailToggle, setSendEmailToggle] = useState(true)
+  const [approvalSuccessInfo, setApprovalSuccessInfo] = useState<{
+    orderId: string
+    emailSent: boolean
+    recipient: string
+    previewUrl?: string
+  } | null>(null)
 
   // Settings State
   const [settings, setSettings] = useState<StoreSettingsState>({
@@ -454,6 +463,7 @@ export default function AdminPage() {
     setWeTransferInput(order.weTransferLink || settings.defaultBundleWeTransfer)
     setOrderR2KeyInput(order.r2Key || (order.items && (order.items as any)[0]?.r2Key) || '')
     setAdminNotesInput(order.adminNotes || 'Хаан банк дээр гүйлгээ шалгагдаж баталгаажсан.')
+    setSendEmailToggle(true)
   }
 
   const handleApproveOrder = async () => {
@@ -470,12 +480,19 @@ export default function AdminPage() {
           customWeTransferLink: weTransferInput.trim(),
           r2Key: orderR2KeyInput.trim(),
           adminNotes: adminNotesInput.trim(),
+          sendEmail: sendEmailToggle,
           passcode,
         }),
       })
 
       const data = await res.json()
       if (data.success) {
+        setApprovalSuccessInfo({
+          orderId: selectedOrder.id,
+          emailSent: !!data.emailResult?.success,
+          recipient: selectedOrder.customerEmail,
+          previewUrl: `/api/orders/${selectedOrder.id}/email-preview`,
+        })
         setSelectedOrder(null)
         fetchOrders(passcode)
       } else {
@@ -486,6 +503,35 @@ export default function AdminPage() {
       alert('Сүлжээний алдаа гарлаа.')
     } finally {
       setApproving(false)
+    }
+  }
+
+  const handleResendEmail = async (order: Order) => {
+    if (!confirm(`${order.customerEmail} хаяг руу татах холбоосыг дахин и-мэйлээр илгээх үү?`)) return
+    try {
+      const res = await fetch('/api/admin/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          action: 'RESEND_EMAIL',
+          passcode,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setApprovalSuccessInfo({
+          orderId: order.id,
+          emailSent: true,
+          recipient: order.customerEmail,
+          previewUrl: `/api/orders/${order.id}/email-preview`,
+        })
+        alert(data.message || `И-мэйл амжилттай дахин илгээгдлээ: ${order.customerEmail}`)
+      } else {
+        alert(data.error || 'И-мэйл илгээхэд алдаа гарлаа.')
+      }
+    } catch (e) {
+      alert('Сүлжээний алдаа гарлаа.')
     }
   }
 
@@ -1007,6 +1053,39 @@ export default function AdminPage() {
               </div>
             </div>
 
+            {approvalSuccessInfo && (
+              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-xs text-emerald-900">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="font-bold">{approvalSuccessInfo.orderId}</span> захиалга амжилттай баталгаажлаа!
+                    {approvalSuccessInfo.emailSent && (
+                      <span className="ml-1 text-emerald-800 font-medium">
+                        Татах холбоос <strong>{approvalSuccessInfo.recipient}</strong> хаяг руу и-мэйлээр илгээгдсэн.
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <a
+                    href={approvalSuccessInfo.previewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-2.5 py-1 rounded bg-white border border-emerald-300 text-emerald-700 font-semibold text-[11px] hover:bg-emerald-100 flex items-center gap-1 shadow-2xs"
+                  >
+                    <Mail className="w-3 h-3" />
+                    <span>И-мэйл харах</span>
+                  </a>
+                  <button
+                    onClick={() => setApprovalSuccessInfo(null)}
+                    className="text-emerald-500 hover:text-emerald-800 p-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Filter Tabs & Search */}
             <div className="bg-white border border-[#E6E6E3] rounded-xl p-3 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
               <div className="flex items-center gap-1.5">
@@ -1120,17 +1199,37 @@ export default function AdminPage() {
                                 <span>Баталгаажуулах</span>
                               </button>
                             ) : (
-                              <div className="flex items-center justify-end gap-1.5">
+                              <div className="flex items-center justify-end gap-2">
                                 <Link
                                   href={`/order/${order.id}`}
                                   target="_blank"
-                                  className="text-[10px] text-[#0088CC] hover:underline"
+                                  className="text-[11px] text-[#0088CC] hover:underline"
+                                  title="Хэрэглэгчийн захиалгын баримт хуудас"
                                 >
                                   Хуудас
                                 </Link>
+                                <a
+                                  href={`/api/orders/${order.id}/email-preview`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-[11px] text-zinc-600 hover:text-black hover:underline flex items-center gap-0.5"
+                                  title="Хэрэглэгчид илгээсэн и-мэйлийг бүтнээр нь харах"
+                                >
+                                  <Mail className="w-3 h-3 text-zinc-400" />
+                                  <span>И-мэйл</span>
+                                </a>
+                                <button
+                                  onClick={() => handleResendEmail(order)}
+                                  className="text-[11px] text-zinc-600 hover:text-emerald-700 hover:underline flex items-center gap-0.5 cursor-pointer"
+                                  title="И-мэйлийг хэрэглэгч рүү дахин илгээх"
+                                >
+                                  <Send className="w-3 h-3 text-zinc-400" />
+                                  <span>Дахин илгээх</span>
+                                </button>
                                 <button
                                   onClick={() => openApproveModal(order)}
-                                  className="text-[10px] text-zinc-400 hover:text-black underline"
+                                  className="text-[11px] text-zinc-400 hover:text-black underline cursor-pointer"
+                                  title="Татах линкийг өөрчлөх"
                                 >
                                   Линк солих
                                 </button>
@@ -2062,6 +2161,26 @@ export default function AdminPage() {
                   className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                 />
               </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 mb-4">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sendEmailToggle}
+                  onChange={(e) => setSendEmailToggle(e.target.checked)}
+                  className="mt-0.5 rounded border-blue-300 text-[#0088CC] focus:ring-[#00B0FF]"
+                />
+                <div className="text-xs">
+                  <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <Mail className="w-3.5 h-3.5 text-[#0088CC]" />
+                    <span>Татах холбоосыг хэрэглэгчийн и-мэйл рүү илгээх</span>
+                  </div>
+                  <div className="text-blue-700 text-[11px] mt-0.5">
+                    Хүлээн авагч: <span className="font-mono font-semibold">{selectedOrder.customerEmail}</span>
+                  </div>
+                </div>
+              </label>
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-[#E6E6E3] pt-3">

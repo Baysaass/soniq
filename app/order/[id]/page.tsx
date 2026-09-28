@@ -228,6 +228,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 Таны төлбөр амжилттай баталгаажлаа. Доорх товч дээр даран өндөр хурдны серверээс файл багцаа шууд татаж авна уу.
               </p>
 
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200/60 text-[#0088CC] text-[11px] font-semibold mt-2.5">
+                <span>✉️ Татах холбоосыг таны <strong>{order.customerEmail}</strong> хаяг руу бас и-мэйлээр илгээсэн.</span>
+              </div>
+
               {/* R2 Direct Download and/or WeTransfer */}
               <div className="w-full max-w-md mt-5 space-y-3">
                 {order.r2Key && (

@@ -52,6 +52,7 @@ export function StoreCheckoutModal() {
           image: checkoutTargetProduct.image,
           quantity: 1,
           weTransferLink: checkoutTargetProduct.defaultWeTransferLink,
+          r2Key: checkoutTargetProduct.r2Key,
         },
       ]
     : cart.map((item) => ({
@@ -62,6 +63,7 @@ export function StoreCheckoutModal() {
         image: item.product.image,
         quantity: item.quantity,
         weTransferLink: item.product.defaultWeTransferLink,
+        r2Key: item.product.r2Key,
       }))
 
   const totalMNT = checkoutTargetProduct
