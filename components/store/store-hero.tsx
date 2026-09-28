@@ -40,7 +40,7 @@ export function StoreHero() {
               </span>
               <span className="text-zinc-400 text-[11px]">·</span>
               <span className="text-[11px] text-zinc-500 hidden sm:inline">
-                Монголын кино & видео бүтээгчдэд зориулсан мэргэжлийн дижитал сан
+                График дизайнерууд & фрилансеруудад зориулсан мэргэжлийн дижитал сан
               </span>
             </div>
 
@@ -60,13 +60,13 @@ export function StoreHero() {
               className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-zinc-50 transition-colors group"
             >
               <div className="w-7 h-7 rounded-md bg-[#E5F6FF] text-[#0088CC] flex items-center justify-center shrink-0">
-                <Music2 className="w-3.5 h-3.5" />
+                <Layers className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] font-bold text-zinc-900 group-hover:text-[#0088CC] truncate">
-                  5,000+ Sound FX
+                  Дизайн & Мокап
                 </div>
-                <div className="text-[10px] text-zinc-500 truncate">Braams, Whoosh, Reels</div>
+                <div className="text-[10px] text-zinc-500 truncate">PSD, Vector, Templates</div>
               </div>
             </a>
 
@@ -79,9 +79,9 @@ export function StoreHero() {
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] font-bold text-zinc-900 group-hover:text-amber-600 truncate">
-                  500+ Cine LUTs
+                  Өнгө & LUTs
                 </div>
-                <div className="text-[10px] text-zinc-500 truncate">Sony, Canon, iPhone Log</div>
+                <div className="text-[10px] text-zinc-500 truncate">Sony, Canon, Lightroom</div>
               </div>
             </a>
 
@@ -90,13 +90,13 @@ export function StoreHero() {
               className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-zinc-50 transition-colors group"
             >
               <div className="w-7 h-7 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Film className="w-3.5 h-3.5" />
+                <Music2 className="w-3.5 h-3.5" />
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] font-bold text-zinc-900 group-hover:text-indigo-600 truncate">
-                  Presets & FX
+                  Sound & FX
                 </div>
-                <div className="text-[10px] text-zinc-500 truncate">Motion blur, Speed ramps</div>
+                <div className="text-[10px] text-zinc-500 truncate">Reels, Video, Audio FX</div>
               </div>
             </a>
 
@@ -109,9 +109,9 @@ export function StoreHero() {
               </div>
               <div className="min-w-0">
                 <div className="text-[11px] font-bold text-zinc-900 group-hover:text-black truncate">
-                  Soniq Extension
+                  Soniq Tools
                 </div>
-                <div className="text-[10px] text-zinc-500 truncate">Premiere Pro апп</div>
+                <div className="text-[10px] text-zinc-500 truncate">Бүтээмжийн өргөтгөл</div>
               </div>
             </Link>
           </div>
@@ -239,28 +239,28 @@ export function StoreHero() {
               <span>SONIQ DIGITAL CREATIVE STORE</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-[#141414] tracking-tight max-w-2xl mx-auto">
-              Монголын Кино & Видео Бүтээгчдэд Зориулсан Мэргэжлийн Дижитал Сан
+              График Дизайнерууд & Freelancer Бүтээгчдэд Зориулсан Мэргэжлийн Дижитал Сан
             </h1>
             <p className="text-xs sm:text-sm text-zinc-500 mt-2 max-w-xl mx-auto leading-relaxed">
-              WeTransfer өндөр хурдны шууд таталт, 100% Commercial Royalty-Free лиценз бүхий дууны сан, өнгө, Premiere Pro өргөтгөлүүд.
+              WeTransfer өндөр хурдны шууд таталт, 100% Commercial Royalty-Free лиценз бүхий дизайн ассет, мокап, вектор, фонт болон бүтээлч хэрэгслүүд.
             </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-6 max-w-2xl mx-auto text-left">
               <div className="p-3 rounded-xl bg-[#F7F7F5] border border-[#E6E6E3]">
-                <div className="text-[#0088CC] font-bold text-xs mb-0.5">5,000+ SFX</div>
-                <div className="text-[11px] text-zinc-500">Lossless 24-bit WAV дуунууд</div>
+                <div className="text-[#0088CC] font-bold text-xs mb-0.5">Дизайн & Мокап</div>
+                <div className="text-[11px] text-zinc-500">PSD, Vector, Эх бэлтгэл</div>
               </div>
               <div className="p-3 rounded-xl bg-[#F7F7F5] border border-[#E6E6E3]">
-                <div className="text-amber-600 font-bold text-xs mb-0.5">Cine LUTs</div>
-                <div className="text-[11px] text-zinc-500">Sony, Canon, iPhone Log</div>
+                <div className="text-amber-600 font-bold text-xs mb-0.5">Өнгө & LUTs</div>
+                <div className="text-[11px] text-zinc-500">Lightroom, Log, Presets</div>
               </div>
               <div className="p-3 rounded-xl bg-[#F7F7F5] border border-[#E6E6E3]">
                 <div className="text-indigo-600 font-bold text-xs mb-0.5">WeTransfer Pro</div>
-                <div className="text-[11px] text-zinc-500">Шууд татах холбоос</div>
+                <div className="text-[11px] text-zinc-500">Шууд татах өндөр хурд</div>
               </div>
               <div className="p-3 rounded-xl bg-[#F7F7F5] border border-[#E6E6E3]">
-                <div className="text-emerald-600 font-bold text-xs mb-0.5">Royalty Free</div>
-                <div className="text-[11px] text-zinc-500">Арилжааны бүрэн эрхтэй</div>
+                <div className="text-emerald-600 font-bold text-xs mb-0.5">100% Royalty Free</div>
+                <div className="text-[11px] text-zinc-500">Freelance & Арилжааны эрх</div>
               </div>
             </div>
           </div>
