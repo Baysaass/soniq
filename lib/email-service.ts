@@ -332,17 +332,19 @@ export async function sendOrderApprovedEmail(params: {
 
   // 1. Try Resend if RESEND_API_KEY is configured
   const resendApiKey = process.env.RESEND_API_KEY
-  if (resendApiKey) {
+  if (resendApiKey && resendApiKey.trim().length > 0) {
+    const fromAddress = (process.env.EMAIL_FROM || 'SONIQ STORE <order@soniq.click>').trim()
+
     try {
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${resendApiKey}`,
+          Authorization: `Bearer ${resendApiKey.trim()}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          from: process.env.EMAIL_FROM || 'SONIQ STORE <onboarding@resend.dev>',
-          to: [order.customerEmail],
+          from: fromAddress,
+          to: [order.customerEmail.trim()],
           subject,
           html,
         }),
@@ -368,16 +370,41 @@ export async function sendOrderApprovedEmail(params: {
           previewHtml: html,
         }
       } else {
-        console.warn('Resend API failed, falling back to simulated log:', resData)
+        const errorMsg = resData?.message || resData?.error || 'Resend и-мэйл илгээхэд алдаа буцаалаа.'
+        console.error('Resend API rejected email delivery:', resData)
+        saveEmailLog({
+          id: `err_${Date.now()}`,
+          orderId: order.id,
+          recipient: order.customerEmail,
+          subject,
+          sentAt: new Date().toISOString(),
+          provider: 'resend-failed',
+          success: false,
+          error: errorMsg,
+          html,
+        })
+        return {
+          success: false,
+          provider: 'resend-failed',
+          error: errorMsg,
+          recipient: order.customerEmail,
+          previewHtml: html,
+        }
       }
     } catch (err: unknown) {
       const error = err as Error
       console.error('Resend send exception:', error.message)
+      return {
+        success: false,
+        provider: 'resend-failed',
+        error: error.message,
+        recipient: order.customerEmail,
+        previewHtml: html,
+      }
     }
   }
 
-  // 2. Development simulation / Local fallback
-  // Save log locally so it can be previewed and verified
+  // 2. Fallback when RESEND_API_KEY is not configured
   const mockId = `sim_${Date.now()}`
   saveEmailLog({
     id: mockId,
@@ -385,23 +412,16 @@ export async function sendOrderApprovedEmail(params: {
     recipient: order.customerEmail,
     subject,
     sentAt: new Date().toISOString(),
-    provider: 'simulated',
-    success: true,
+    provider: 'not-configured',
+    success: false,
+    error: 'RESEND_API_KEY тохируулагдаагүй байна.',
     html,
   })
 
-  console.log(`\n================== ✉️ EMAIL SIMULATED (${order.customerEmail}) ==================`)
-  console.log(`To: ${order.customerEmail}`)
-  console.log(`Subject: ${subject}`)
-  console.log(`Download URL: ${directDownloadUrl}`)
-  console.log(`WeTransfer: ${weTransferUrl || 'N/A'}`)
-  console.log(`R2 Link: ${r2DownloadUrl ? 'Generated (7 days)' : 'N/A'}`)
-  console.log(`Preview: ${siteUrl}/api/orders/${order.id}/email-preview`)
-  console.log(`=========================================================================\n`)
-
   return {
-    success: true,
-    provider: 'simulated',
+    success: false,
+    provider: 'not-configured',
+    error: 'Vercel Settings -> Environment Variables дээр RESEND_API_KEY болон EMAIL_FROM тохируулагдаагүй байна.',
     messageId: mockId,
     recipient: order.customerEmail,
     previewHtml: html,

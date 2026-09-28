@@ -38,9 +38,16 @@ export async function POST(request: Request) {
         }
       }
 
+      const emailSuccess = Boolean(emailResult?.success)
+      const emailNote = emailResult
+        ? emailSuccess
+          ? ' И-мэйл захиалагч руу амжилттай илгээгдлээ.'
+          : ` Гэвч и-мэйл илгээгдсэнгүй: ${emailResult.error}`
+        : ''
+
       return NextResponse.json({
         success: true,
-        message: 'Захиалга амжилттай баталгаажлаа.',
+        message: `Захиалга амжилттай баталгаажлаа.${emailNote}`,
         order: updated,
         emailResult,
       })
@@ -56,6 +63,17 @@ export async function POST(request: Request) {
         customWeTransferLink,
         customR2Key: r2Key,
       })
+
+      if (!emailResult?.success) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: emailResult?.error || 'И-мэйл илгээж чадсангүй. Resend тохиргоог шалгана уу.',
+            emailResult,
+          },
+          { status: 400 }
+        )
+      }
 
       return NextResponse.json({
         success: true,

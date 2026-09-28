@@ -103,6 +103,7 @@ export default function AdminPage() {
     emailSent: boolean
     recipient: string
     previewUrl?: string
+    error?: string
   } | null>(null)
 
   // Settings State
@@ -127,6 +128,22 @@ export default function AdminPage() {
   const [dbStatus, setDbStatus] = useState<any>(null)
   const [testingDB, setTestingDB] = useState(false)
 
+  // Email service status state
+  const [emailStatus, setEmailStatus] = useState<{
+    hasKey: boolean
+    keyPrefix: string
+    emailFrom: string
+    siteUrl: string
+    isUsingDefaultOnboarding: boolean
+  } | null>(null)
+  const [testingEmail, setTestingEmail] = useState(false)
+  const [testEmailInput, setTestEmailInput] = useState('')
+  const [emailTestResult, setEmailTestResult] = useState<{
+    success: boolean
+    message?: string
+    error?: string
+  } | null>(null)
+
   // Password change state
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
   const [currentPasswordInput, setCurrentPasswordInput] = useState('')
@@ -134,6 +151,21 @@ export default function AdminPage() {
   const [confirmPasswordInput, setConfirmPasswordInput] = useState('')
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false)
   const [passwordChangeMessage, setPasswordChangeMessage] = useState<{ success: boolean; text: string } | null>(null)
+
+  // Fetch Email Status
+  const fetchEmailStatus = async (codeToUse?: string) => {
+    const pc = codeToUse || passcode
+    if (!pc) return
+    try {
+      const res = await fetch(`/api/admin/email-status?passcode=${encodeURIComponent(pc)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setEmailStatus(data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch email status:', err)
+    }
+  }
 
   // Fetch DB Status
   const fetchDBStatus = async () => {
@@ -166,6 +198,7 @@ export default function AdminPage() {
             fetchOrders(saved)
             fetchSettings()
             fetchDBStatus()
+            fetchEmailStatus(saved)
           } else {
             sessionStorage.removeItem('soniq_admin_passcode')
           }
@@ -177,6 +210,7 @@ export default function AdminPage() {
           fetchOrders(saved)
           fetchSettings()
           fetchDBStatus()
+          fetchEmailStatus(saved)
         })
     }
   }, [])
@@ -195,11 +229,50 @@ export default function AdminPage() {
         fetchOrders(passcode)
         fetchSettings()
         fetchDBStatus()
+        fetchEmailStatus(passcode)
       } else {
         setAuthError(data.error || 'Нууц үг буруу байна.')
       }
     } catch (err) {
       setAuthError('Холболтын алдаа гарлаа.')
+    }
+  }
+
+  const handleTestSendEmail = async () => {
+    if (!testEmailInput.trim() || !testEmailInput.includes('@')) {
+      alert('Шалгах и-мэйл хаягаа зөв оруулна уу (Жишээ: yourname@gmail.com)')
+      return
+    }
+    setTestingEmail(true)
+    setEmailTestResult(null)
+    try {
+      const res = await fetch('/api/admin/email-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          passcode,
+          testEmail: testEmailInput.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setEmailTestResult({
+          success: true,
+          message: `✓ Амжилттай! ${testEmailInput} хаяг руу бодит и-мэйл илгээгдлээ. (Message ID: ${data.messageId})`,
+        })
+      } else {
+        setEmailTestResult({
+          success: false,
+          error: data.error || (data.details ? JSON.stringify(data.details) : 'Resend алдаа буцаалаа'),
+        })
+      }
+    } catch (err: any) {
+      setEmailTestResult({
+        success: false,
+        error: err.message || 'Сүлжээний алдаа гарлаа',
+      })
+    } finally {
+      setTestingEmail(false)
     }
   }
 
@@ -487,12 +560,17 @@ export default function AdminPage() {
 
       const data = await res.json()
       if (data.success) {
+        const isEmailSent = Boolean(data.emailResult?.success)
         setApprovalSuccessInfo({
           orderId: selectedOrder.id,
-          emailSent: !!data.emailResult?.success,
+          emailSent: isEmailSent,
           recipient: selectedOrder.customerEmail,
           previewUrl: `/api/orders/${selectedOrder.id}/email-preview`,
+          error: data.emailResult?.error,
         })
+        if (!isEmailSent && sendEmailToggle) {
+          alert(`Захиалга баталгаажлаа.\n\n⚠️ Анхааруулга: И-мэйл захиалагч руу илгээгдэж чадсангүй:\n${data.emailResult?.error || 'Resend тохиргоо дутуу'}`)
+        }
         setSelectedOrder(null)
         fetchOrders(passcode)
       } else {
@@ -519,16 +597,16 @@ export default function AdminPage() {
         }),
       })
       const data = await res.json()
-      if (data.success) {
+      if (data.success && data.emailResult?.success) {
         setApprovalSuccessInfo({
           orderId: order.id,
           emailSent: true,
           recipient: order.customerEmail,
           previewUrl: `/api/orders/${order.id}/email-preview`,
         })
-        alert(data.message || `И-мэйл амжилттай дахин илгээгдлээ: ${order.customerEmail}`)
+        alert(data.message || `✓ И-мэйл амжилттай дахин илгээгдлээ: ${order.customerEmail}`)
       } else {
-        alert(data.error || 'И-мэйл илгээхэд алдаа гарлаа.')
+        alert(`⚠️ И-мэйл илгээхэд алдаа гарлаа:\n${data.error || data.emailResult?.error || 'Resend алдаа'}`)
       }
     } catch (e) {
       alert('Сүлжээний алдаа гарлаа.')
@@ -1054,31 +1132,47 @@ export default function AdminPage() {
             </div>
 
             {approvalSuccessInfo && (
-              <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3 text-xs text-emerald-900">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div
+                className={`mb-4 p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
+                  approvalSuccessInfo.emailSent
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                    : 'bg-amber-50 border-amber-200 text-amber-900'
+                }`}
+              >
+                <div className="flex items-start gap-2.5">
+                  {approvalSuccessInfo.emailSent ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  )}
                   <div>
-                    <span className="font-bold">{approvalSuccessInfo.orderId}</span> захиалга амжилттай баталгаажлаа!
-                    {approvalSuccessInfo.emailSent && (
-                      <span className="ml-1 text-emerald-800 font-medium">
-                        Татах холбоос <strong>{approvalSuccessInfo.recipient}</strong> хаяг руу и-мэйлээр илгээгдсэн.
-                      </span>
+                    <div>
+                      <span className="font-bold">{approvalSuccessInfo.orderId}</span> захиалга амжилттай баталгаажлаа!
+                    </div>
+                    {approvalSuccessInfo.emailSent ? (
+                      <div className="text-emerald-800 font-medium mt-0.5">
+                        ✓ Татах холбоос бүхий и-мэйл <strong>{approvalSuccessInfo.recipient}</strong> хаяг руу амжилттай илгээгдлээ.
+                      </div>
+                    ) : (
+                      <div className="text-amber-800 font-medium mt-0.5">
+                        ⚠️ Анхааруулга: Захиалагчийн и-мэйл рүү илгээгдсэнгүй: <strong>{approvalSuccessInfo.error || 'Resend тохиргоогоо шалгана уу'}</strong>
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                   <a
                     href={approvalSuccessInfo.previewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-2.5 py-1 rounded bg-white border border-emerald-300 text-emerald-700 font-semibold text-[11px] hover:bg-emerald-100 flex items-center gap-1 shadow-2xs"
+                    className="px-2.5 py-1 rounded bg-white border border-zinc-300 text-zinc-700 font-semibold text-[11px] hover:bg-zinc-50 flex items-center gap-1 shadow-2xs"
                   >
-                    <Mail className="w-3 h-3" />
+                    <Mail className="w-3 h-3 text-[#00B0FF]" />
                     <span>И-мэйл харах</span>
                   </a>
                   <button
                     onClick={() => setApprovalSuccessInfo(null)}
-                    className="text-emerald-500 hover:text-emerald-800 p-1 cursor-pointer"
+                    className="text-zinc-400 hover:text-zinc-700 p-1 cursor-pointer"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -1596,6 +1690,110 @@ export default function AdminPage() {
                     <RefreshCw className={`w-3 h-3 ${testingDB ? 'animate-spin' : ''}`} />
                     <span>{testingDB ? 'Шалгаж байна...' : 'Шалгах'}</span>
                   </button>
+                </div>
+              </div>
+
+              {/* Email Service (Resend) Diagnostics */}
+              <div className="p-4 bg-[#FAFAFA] rounded-xl border border-[#E6E6E3] space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5 font-bold text-zinc-800 text-xs">
+                    <Mail className="w-4 h-4 text-[#0088CC]" />
+                    <span>И-мэйл үйлчилгээний холболт (Resend Email Delivery)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                        emailStatus?.hasKey
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${emailStatus?.hasKey ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                      <span>{emailStatus?.hasKey ? 'Resend API Холбогдсон' : 'RESEND_API_KEY байхгүй'}</span>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
+                  <div className="p-2.5 rounded-lg bg-white border border-[#E6E6E3]">
+                    <span className="text-[10px] text-zinc-400 block font-mono">ИЛГЭЭХ ХАЯГ (EMAIL_FROM)</span>
+                    <span className="font-bold text-zinc-800 font-mono text-[11px] block truncate">
+                      {emailStatus?.emailFrom || 'Тодорхойгүй'}
+                    </span>
+                    {emailStatus?.isUsingDefaultOnboarding && (
+                      <span className="text-[10px] text-amber-600 block mt-0.5">
+                        ⚠️ Анхаар: onboarding@resend.dev хаягаар зөвхөн Resend-д бүртгэлтэй өөрийн и-мэйл рүү туршилт хийж болно. Хэрэглэгчид рүү илгээхийн тулд Vercel дээр EMAIL_FROM=SONIQ STORE &lt;order@soniq.click&gt; гэж тохируулна.
+                      </span>
+                    )}
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-white border border-[#E6E6E3]">
+                    <span className="text-[10px] text-zinc-400 block font-mono">САЙТЫН ХОЛБООС (SITE_URL)</span>
+                    <span className="font-bold text-zinc-800 font-mono text-[11px] block truncate">
+                      {emailStatus?.siteUrl || 'https://shop.soniq.click'}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 block mt-0.5">
+                      И-мэйл доторх татах товчны үндсэн хаяг
+                    </span>
+                  </div>
+                </div>
+
+                {/* Live Test Email Tool */}
+                <div className="pt-2 border-t border-zinc-200/80 space-y-2">
+                  <span className="text-[11px] font-semibold text-zinc-700 block">
+                    И-мэйл илгээх холболт шууд шалгах (Live Test):
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="email"
+                      value={testEmailInput}
+                      onChange={(e) => setTestEmailInput(e.target.value)}
+                      placeholder="Жишээ: yourname@gmail.com"
+                      className="flex-1 px-3 py-1.5 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleTestSendEmail}
+                      disabled={testingEmail}
+                      className="py-1.5 px-3 rounded-lg bg-[#141414] hover:bg-black text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-xs"
+                    >
+                      <Send className={`w-3.5 h-3.5 ${testingEmail ? 'animate-spin' : ''}`} />
+                      <span>{testingEmail ? 'Илгээж байна...' : 'Тест и-мэйл явуулах'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fetchEmailStatus()}
+                      title="Төлөв шинэчлэх"
+                      className="p-1.5 rounded-lg border border-[#E6E6E3] bg-white hover:bg-zinc-50 text-zinc-600 cursor-pointer shadow-xs"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {emailTestResult && (
+                    <div
+                      className={`p-2.5 rounded-lg text-xs flex items-start gap-2 ${
+                        emailTestResult.success
+                          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                          : 'bg-red-50 border border-red-200 text-red-800'
+                      }`}
+                    >
+                      {emailTestResult.success ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        {emailTestResult.success ? (
+                          <span>{emailTestResult.message}</span>
+                        ) : (
+                          <div>
+                            <strong>И-мэйл илгээж чадсангүй:</strong>
+                            <p className="mt-0.5 font-mono text-[11px] whitespace-pre-wrap">{emailTestResult.error}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
