@@ -95,6 +95,7 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
   return row
 }
 
+
 // Convert DB snake_case order row to Order
 function mapOrderRow(row: any): Order {
   return {
@@ -110,7 +111,7 @@ function mapOrderRow(row: any): Order {
     currency: row.currency || 'MNT',
     status: row.status || 'PENDING',
     paymentMethod: row.payment_method || 'KHAN_BANK',
-    transferReference: row.transfer_reference || '',
+    transferReference: row.transfer_reference || row.id || '',
     receiptNote: row.receipt_note || '',
     weTransferLink: row.wetransfer_link || '',
     r2Key: row.r2_key || '',
@@ -119,26 +120,53 @@ function mapOrderRow(row: any): Order {
   }
 }
 
-// Convert Order to DB row
-function mapOrderToRow(order: Partial<Order>): Record<string, any> {
+// Convert Order for creation to DB row (ensuring id and required constraints)
+function mapOrderCreateToRow(order: Partial<Order>): Record<string, any> {
+  const orderId = order.id || `SQ-${Math.floor(10000 + Math.random() * 90000)}`
+  const row: Record<string, any> = {
+    id: orderId,
+    customer_name: (order.customerName || 'Захиалагч').trim(),
+    customer_email: (order.customerEmail || '').trim(),
+    customer_phone: (order.customerPhone || '').trim(),
+    customer_notes: (order.customerNotes || '').trim(),
+    items: Array.isArray(order.items) ? order.items : [],
+    total_amount_mnt: Math.round(Number(order.totalAmountMNT) || 0),
+    total_amount_usd: Number(order.totalAmountUSD) || 0,
+    currency: order.currency || 'MNT',
+    status: order.status || 'PENDING',
+    payment_method: order.paymentMethod || 'KHAN_BANK',
+    transfer_reference: order.transferReference || orderId,
+    receipt_note: (order.receiptNote || '').trim(),
+    wetransfer_link: (order.weTransferLink || '').trim(),
+    r2_key: (order.r2Key || '').trim(),
+    admin_notes: (order.adminNotes || '').trim(),
+    created_at: order.createdAt || new Date().toISOString(),
+  }
+  if (order.approvedAt) {
+    row.approved_at = order.approvedAt
+  }
+  return row
+}
+
+// Convert Order updates to DB row (only defined fields)
+function mapOrderUpdatesToRow(updates: Partial<Order>): Record<string, any> {
   const row: Record<string, any> = {}
-  if (order.id !== undefined) row.id = order.id
-  if (order.customerName !== undefined) row.customer_name = order.customerName
-  if (order.customerEmail !== undefined) row.customer_email = order.customerEmail
-  if (order.customerPhone !== undefined) row.customer_phone = order.customerPhone
-  if (order.customerNotes !== undefined) row.customer_notes = order.customerNotes
-  if (order.items !== undefined) row.items = order.items
-  if (order.totalAmountMNT !== undefined) row.total_amount_mnt = order.totalAmountMNT
-  if (order.totalAmountUSD !== undefined) row.total_amount_usd = order.totalAmountUSD
-  if (order.currency !== undefined) row.currency = order.currency
-  if (order.status !== undefined) row.status = order.status
-  if (order.paymentMethod !== undefined) row.payment_method = order.paymentMethod
-  if (order.transferReference !== undefined) row.transfer_reference = order.transferReference
-  if (order.receiptNote !== undefined) row.receipt_note = order.receiptNote
-  if (order.weTransferLink !== undefined) row.wetransfer_link = order.weTransferLink
-  if (order.r2Key !== undefined) row.r2_key = order.r2Key
-  if (order.approvedAt !== undefined) row.approved_at = order.approvedAt
-  if (order.adminNotes !== undefined) row.admin_notes = order.adminNotes
+  if (updates.customerName !== undefined) row.customer_name = updates.customerName
+  if (updates.customerEmail !== undefined) row.customer_email = updates.customerEmail
+  if (updates.customerPhone !== undefined) row.customer_phone = updates.customerPhone
+  if (updates.customerNotes !== undefined) row.customer_notes = updates.customerNotes
+  if (updates.items !== undefined) row.items = updates.items
+  if (updates.totalAmountMNT !== undefined) row.total_amount_mnt = Math.round(Number(updates.totalAmountMNT) || 0)
+  if (updates.totalAmountUSD !== undefined) row.total_amount_usd = Number(updates.totalAmountUSD) || 0
+  if (updates.currency !== undefined) row.currency = updates.currency
+  if (updates.status !== undefined) row.status = updates.status
+  if (updates.paymentMethod !== undefined) row.payment_method = updates.paymentMethod
+  if (updates.transferReference !== undefined) row.transfer_reference = updates.transferReference
+  if (updates.receiptNote !== undefined) row.receipt_note = updates.receiptNote
+  if (updates.weTransferLink !== undefined) row.wetransfer_link = updates.weTransferLink
+  if (updates.r2Key !== undefined) row.r2_key = updates.r2Key
+  if (updates.approvedAt !== undefined) row.approved_at = updates.approvedAt
+  if (updates.adminNotes !== undefined) row.admin_notes = updates.adminNotes
   return row
 }
 
@@ -226,18 +254,22 @@ export const supabaseDB = {
     const supabase = getSupabaseClient()
     if (!supabase) return null
     const { data, error } = await supabase.from('orders').select('*').eq('id', id).maybeSingle()
-    if (error || !data) return null
+    if (error) {
+      console.error('Supabase getOrderById error:', error)
+      return null
+    }
+    if (!data) return null
     return mapOrderRow(data)
   },
 
   async createOrder(order: Partial<Order>): Promise<Order | null> {
     const supabase = getSupabaseClient()
     if (!supabase) return null
-    const row = mapOrderToRow(order)
+    const row = mapOrderCreateToRow(order)
     const { data, error } = await supabase.from('orders').insert([row]).select('*').single()
     if (error) {
       console.error('Supabase createOrder error:', error)
-      throw new Error(error.message)
+      throw new Error(`Supabase createOrder алдаа: ${error.message}`)
     }
     return mapOrderRow(data)
   },
@@ -245,11 +277,11 @@ export const supabaseDB = {
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | null> {
     const supabase = getSupabaseClient()
     if (!supabase) return null
-    const row = mapOrderToRow(updates)
+    const row = mapOrderUpdatesToRow(updates)
     const { data, error } = await supabase.from('orders').update(row).eq('id', id).select('*').single()
     if (error) {
       console.error('Supabase updateOrder error:', error)
-      throw new Error(error.message)
+      throw new Error(`Supabase updateOrder алдаа: ${error.message}`)
     }
     return mapOrderRow(data)
   },

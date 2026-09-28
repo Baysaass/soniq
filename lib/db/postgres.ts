@@ -263,6 +263,7 @@ export const postgresDB = {
   async createOrder(order: Partial<Order>): Promise<Order | null> {
     const pool = getPostgresPool()
     if (!pool) return null
+    const orderId = order.id || `SQ-${Math.floor(10000 + Math.random() * 90000)}`
     try {
       const query = `
         INSERT INTO orders (
@@ -275,23 +276,23 @@ export const postgresDB = {
         ) RETURNING *
       `
       const values = [
-        order.id,
-        order.customerName,
-        order.customerEmail,
-        order.customerPhone || '',
-        order.customerNotes || '',
+        orderId,
+        (order.customerName || 'Захиалагч').trim(),
+        (order.customerEmail || '').trim(),
+        (order.customerPhone || '').trim(),
+        (order.customerNotes || '').trim(),
         JSON.stringify(order.items || []),
-        order.totalAmountMNT || 0,
-        order.totalAmountUSD || 0,
+        Math.round(Number(order.totalAmountMNT) || 0),
+        Number(order.totalAmountUSD) || 0,
         order.currency || 'MNT',
         order.status || 'PENDING',
         order.paymentMethod || 'KHAN_BANK',
-        order.transferReference || '',
-        order.receiptNote || '',
-        order.weTransferLink || '',
-        order.r2Key || '',
+        order.transferReference || orderId,
+        (order.receiptNote || '').trim(),
+        (order.weTransferLink || '').trim(),
+        (order.r2Key || '').trim(),
         order.approvedAt || null,
-        order.adminNotes || '',
+        (order.adminNotes || '').trim(),
       ]
       const res = await pool.query(query, values)
       return mapOrderRow(res.rows[0])

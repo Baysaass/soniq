@@ -78,9 +78,12 @@ export async function POST(request: Request) {
       orderId: order.id,
       order,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating order:', error)
-    return NextResponse.json({ error: 'Захиалга үүсгэхэд алдаа гарлаа.' }, { status: 500 })
+    return NextResponse.json(
+      { error: error?.message || 'Захиалга үүсгэхэд алдаа гарлаа.' },
+      { status: 500 }
+    )
   }
 }
 

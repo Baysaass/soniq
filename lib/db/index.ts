@@ -188,24 +188,35 @@ export const db = {
   },
 
   async createOrder(data: Partial<Order>): Promise<Order> {
+    const orderId = data.id || `SQ-${Math.floor(10000 + Math.random() * 90000)}`
+    const orderData: Partial<Order> = {
+      ...data,
+      id: orderId,
+      transferReference: data.transferReference || orderId,
+      status: data.status || 'PENDING',
+      createdAt: data.createdAt || new Date().toISOString(),
+    }
+
     const provider = getActiveDBProvider()
     if (provider === 'supabase') {
       try {
-        const order = await supabaseDB.createOrder(data)
+        const order = await supabaseDB.createOrder(orderData)
         if (order) return order
       } catch (err) {
-        console.error('Supabase createOrder failed, saving locally:', err)
+        console.error('Supabase createOrder failed:', err)
+        throw err
       }
     }
     if (provider === 'postgres') {
       try {
-        const order = await postgresDB.createOrder(data)
+        const order = await postgresDB.createOrder(orderData)
         if (order) return order
       } catch (err) {
-        console.error('PostgreSQL createOrder failed, saving locally:', err)
+        console.error('PostgreSQL createOrder failed:', err)
+        throw err
       }
     }
-    return localDB.createOrder(data)
+    return localDB.createOrder(orderData)
   },
 
   async approveOrder(
