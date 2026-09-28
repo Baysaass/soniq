@@ -21,12 +21,21 @@ export function Navbar({ onGetClick }: { onGetClick: (e: React.MouseEvent) => vo
         </Link>
 
         {/* Desktop center nav */}
-        <nav className="hidden md:flex items-center gap-0.5">
+        <nav className="hidden md:flex items-center gap-1">
           <Link
             href="/#features"
-            className="px-3.5 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-150 rounded-full hover:bg-foreground/5"
+            className="px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground transition-colors duration-150 rounded-full hover:bg-foreground/5"
           >
             {t('nav_features')}
+          </Link>
+          <Link
+            href="/shop"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-bold text-foreground hover:text-red-500 transition-colors duration-150 rounded-full hover:bg-foreground/5"
+          >
+            <span>Дэлгүүр (Store)</span>
+            <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-gradient-to-r from-red-600 to-amber-600 text-white">
+              85% OFF
+            </span>
           </Link>
         </nav>
 
@@ -64,6 +73,16 @@ export function Navbar({ onGetClick }: { onGetClick: (e: React.MouseEvent) => vo
               onClick={() => setMobileOpen(false)}
             >
               {t('nav_features')}
+            </Link>
+            <Link
+              href="/shop"
+              className="px-3 py-2 text-[14px] font-bold text-foreground hover:text-red-500 rounded-xl hover:bg-foreground/5 transition-colors flex items-center justify-between"
+              onClick={() => setMobileOpen(false)}
+            >
+              <span>Дэлгүүр (Store)</span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-gradient-to-r from-red-600 to-amber-600 text-white">
+                85% OFF
+              </span>
             </Link>
           </nav>
           <div className="flex items-center justify-end mt-3 pt-3 border-t border-border">

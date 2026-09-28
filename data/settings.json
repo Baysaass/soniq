@@ -1,0 +1,23 @@
+{
+  "storeName": "SONIQ STORE",
+  "subdomain": "shop.soniq.click",
+  "currencyDefault": "MNT",
+  "adminPasscode": "Amirda700+",
+  "bankInfo": {
+    "bankName": "Хаан Банк (Khan Bank)",
+    "accountNumber": "5608120471",
+    "accountHolder": "Өсөхбаяр",
+    "qpayShortcode": "QPAY-SONIQ",
+    "supportInstagram": "https://www.instagram.com/_baysaa_notfound/",
+    "supportTelegram": "https://t.me/baysaa_vfx"
+  },
+  "defaultBundleWeTransfer": "https://we.tl/t-soniq-ultimate-bundle-2026-vfx",
+  "announcementText": "Бүх багц 85% хямдралтай · WeTransfer шууд таталт",
+  "r2Config": {
+    "accountId": "",
+    "accessKeyId": "",
+    "secretAccessKey": "",
+    "bucketName": "soniq-store",
+    "publicDomain": ""
+  }
+}
