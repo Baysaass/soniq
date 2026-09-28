@@ -153,10 +153,14 @@ export function buildOrderDeliveryEmailHtml(params: {
       <!-- Hero Call To Action Button -->
       <div style="text-align: center; margin: 28px 0 24px 0;">
         <a href="${primaryDownloadUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; width: 100%; box-sizing: border-box; background: linear-gradient(135deg, #00B0FF 0%, #0088CC 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 800; padding: 16px 28px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 176, 255, 0.35); text-align: center; letter-spacing: 0.01em;">
-          📥 Бүтээгдэхүүнийг шууд татах
+          ${weTransferUrl && weTransferUrl.includes('drive.google.com') ? '📁 Google Drive-аар нээж татах' : '📥 Бүтээгдэхүүнийг шууд татах'}
         </a>
-        <div style="font-size: 12px; color: #71717a; margin-top: 10px;">
-          Татах холбоос дээр дарж дижитал файлуудаа бүрэн эхээр нь татаж авна уу.
+        <div style="font-size: 12px; color: #a1a1aa; margin-top: 10px; line-height: 1.5;">
+          ${
+            weTransferUrl && weTransferUrl.includes('drive.google.com')
+              ? `Таны бүртгүүлсэн <strong style="color: #ffffff;">${escapeHtml(order.customerEmail)}</strong> Gmail хаягт хандах эрх нээгдсэн тул шууд татах эсвэл өөрийн Drive-даа хадгална уу.`
+              : 'Татах холбоос дээр дарж дижитал файлуудаа бүрэн эхээр нь татаж авна уу.'
+          }
         </div>
       </div>
 
@@ -182,8 +186,8 @@ export function buildOrderDeliveryEmailHtml(params: {
           weTransferUrl
             ? `
           <div style="margin-bottom: 10px;">
-            <a href="${weTransferUrl}" target="_blank" rel="noopener noreferrer" style="color: #a78bfa; font-size: 13px; text-decoration: none; font-weight: 600;">
-              ⚡ WeTransfer шууд татах холбоос &rarr;
+            <a href="${weTransferUrl}" target="_blank" rel="noopener noreferrer" style="color: ${weTransferUrl.includes('drive.google.com') ? '#38bdf8' : '#a78bfa'}; font-size: 13px; text-decoration: none; font-weight: 600;">
+              ${weTransferUrl.includes('drive.google.com') ? '📁 Google Drive шууд татах холбоос &rarr;' : '⚡ WeTransfer шууд татах холбоос &rarr;'}
             </a>
           </div>
         `
@@ -227,6 +231,7 @@ export function buildOrderDeliveryEmailHtml(params: {
         💡 Ашиглах заавар & Лиценз:
       </div>
       <ul style="margin: 0; padding-left: 20px; color: #a1a1aa;">
+        <li style="margin-bottom: 4px;">Google Drive дээрээс файлыг шууд татах эсвэл <strong>"Add shortcut to Drive"</strong> сонголтоор өөрийн Drive-даа хадгалж болно.</li>
         <li style="margin-bottom: 4px;">Файлууд <strong>.ZIP</strong> форматаар ирэх бөгөөд татаж аваад задалж ашиглана уу.</li>
         <li style="margin-bottom: 4px;"><strong>100% Commercial Royalty-Free:</strong> Та өөрийн бүх захиалагч, видео реклам, кино, YouTube, сошиал медиа контентдоо зохиогчийн эрхийн асуудалгүй ашиглах эрхтэй.</li>
         <li>Файлыг өөрийн хард диск болон Cloud дээрээ хадгалж авахыг зөвлөж байна.</li>

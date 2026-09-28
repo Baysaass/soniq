@@ -89,7 +89,7 @@ export function StoreCheckoutModal() {
     }
 
     if (!email.includes('@')) {
-      setErrorMsg('Зөв и-мэйл хаяг оруулна уу (WeTransfer линк энэ хаягт ирнэ).')
+      setErrorMsg('Зөв и-мэйл хаяг оруулна уу (Google Drive эрх энэ хаягт очно).')
       return
     }
 
@@ -154,7 +154,7 @@ export function StoreCheckoutModal() {
             Төлбөр шилжүүлэх заавар
           </h3>
           <p className="text-xs text-zinc-500 mt-0.5">
-            Та шилжүүлэг хийснээр админ шалгаж, WeTransfer татах линк шууд олгоно.
+            Та шилжүүлэг хийснээр админ шалгаж, Google Drive татах эрх болон холбоос шууд олгоно.
           </p>
         </div>
 
@@ -245,7 +245,7 @@ export function StoreCheckoutModal() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                И-мэйл (WeTransfer очих) <span className="text-red-500">*</span>
+                И-мэйл (Google Drive эрх олгох Gmail) <span className="text-red-500">*</span>
               </label>
               <input
                 type="email"
@@ -255,6 +255,9 @@ export function StoreCheckoutModal() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-[#00B0FF] transition-colors"
               />
+              <span className="text-[10px] text-zinc-400 block mt-0.5">
+                Энэ хаягт Google Drive-аар хандах эрх нээгдэж, татах холбоос очно.
+              </span>
             </div>
 
             <div>

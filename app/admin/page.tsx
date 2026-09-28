@@ -37,6 +37,7 @@ import {
   LogOut,
   Mail,
   Send,
+  Copy,
 } from 'lucide-react'
 import { STORE_SETTINGS, StoreProduct } from '@/lib/store-data'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
@@ -98,6 +99,8 @@ export default function AdminPage() {
   const [orderFilterStatus, setOrderFilterStatus] = useState<'ALL' | 'PENDING' | 'APPROVED'>('ALL')
   const [orderSearchQuery, setOrderSearchQuery] = useState('')
   const [sendEmailToggle, setSendEmailToggle] = useState(true)
+  const [copiedGmail, setCopiedGmail] = useState(false)
+  const [copiedEmailOrderId, setCopiedEmailOrderId] = useState<string | null>(null)
   const [approvalSuccessInfo, setApprovalSuccessInfo] = useState<{
     orderId: string
     emailSent: boolean
@@ -533,10 +536,12 @@ export default function AdminPage() {
   // Approve Order
   const openApproveModal = (order: Order) => {
     setSelectedOrder(order)
-    setWeTransferInput(order.weTransferLink || settings.defaultBundleWeTransfer)
+    const productDefaultLink = (order.items && (order.items as any)[0]?.defaultWeTransferLink) || ''
+    setWeTransferInput(order.weTransferLink || productDefaultLink || settings.defaultBundleWeTransfer || '')
     setOrderR2KeyInput(order.r2Key || (order.items && (order.items as any)[0]?.r2Key) || '')
     setAdminNotesInput(order.adminNotes || 'Хаан банк дээр гүйлгээ шалгагдаж баталгаажсан.')
     setSendEmailToggle(true)
+    setCopiedGmail(false)
   }
 
   const handleApproveOrder = async () => {
@@ -1016,7 +1021,7 @@ export default function AdminPage() {
                                 className="text-[10px] text-[#0088CC] hover:underline flex items-center gap-1 font-mono truncate max-w-[130px]"
                                 title={p.defaultWeTransferLink}
                               >
-                                <span>WeTransfer</span>
+                                <span>{p.defaultWeTransferLink.includes('drive.google.com') ? 'Google Drive' : 'Татах линк'}</span>
                                 <ExternalLink className="w-2.5 h-2.5 shrink-0" />
                               </a>
                             ) : (
@@ -1088,7 +1093,7 @@ export default function AdminPage() {
                   Захиалгын удирдлага
                 </h2>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  Хаан банкны төлбөрийг шалгаад WeTransfer линкийг хэрэглэгчид баталгаажуулан илгээх.
+                  Хаан банкны төлбөрийг шалгаад Google Drive эрх олгож, татах линкийг хэрэглэгчид баталгаажуулан илгээх.
                 </p>
               </div>
 
@@ -1249,7 +1254,25 @@ export default function AdminPage() {
                           <td className="py-3 px-3">
                             <div className="font-semibold text-zinc-900">{order.customerName}</div>
                             <div className="text-[11px] text-zinc-500 font-mono">{order.customerPhone || 'Утасгүй'}</div>
-                            <div className="text-[10px] text-zinc-400">{order.customerEmail}</div>
+                            <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5 mt-0.5">
+                              <span className="truncate max-w-[150px]">{order.customerEmail}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(order.customerEmail)
+                                  setCopiedEmailOrderId(order.id)
+                                  setTimeout(() => setCopiedEmailOrderId(null), 2000)
+                                }}
+                                title="Gmail хуулах (Google Drive-д эрх өгөх)"
+                                className="p-0.5 text-zinc-400 hover:text-blue-600 rounded cursor-pointer transition-colors"
+                              >
+                                {copiedEmailOrderId === order.id ? (
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                ) : (
+                                  <Copy className="w-2.5 h-2.5" />
+                                )}
+                              </button>
+                            </div>
                           </td>
 
                           <td className="py-3 px-3">
@@ -2136,7 +2159,7 @@ export default function AdminPage() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-[11px] font-semibold text-zinc-700">
-                    WeTransfer татах линк (Нөөц / Альтернатив линк)
+                    Google Drive / Татах холбоос (Google Drive эсвэл WeTransfer)
                   </label>
                   <span className="text-[10px] text-zinc-400">
                     {editingProduct.r2Key ? 'Сонголттой (R2 байгаа)' : 'R2 тохируулаагүй бол заавал *'}
@@ -2147,7 +2170,7 @@ export default function AdminPage() {
                   required={!editingProduct.r2Key}
                   value={editingProduct.defaultWeTransferLink || ''}
                   onChange={(e) => setEditingProduct({ ...editingProduct, defaultWeTransferLink: e.target.value })}
-                  placeholder="https://we.tl/t-xxxxxxxx"
+                  placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
                   className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
                 />
               </div>
@@ -2290,15 +2313,15 @@ export default function AdminPage() {
             </button>
 
             <div className="mb-4">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase">
+              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">
                 ЗАХИАЛГА БАТАЛГААЖУУЛАЛТ
               </span>
               <h3 className="text-base font-bold text-[#141414]">
-                WeTransfer татах линк олгох
+                Google Drive эрх олгох ба Татах холбоос
               </h3>
             </div>
 
-            <div className="bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-3 mb-4 text-xs space-y-1">
+            <div className="bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-3 mb-4 text-xs space-y-1.5">
               <div>
                 <span className="text-zinc-500">Захиалга: </span>
                 <span className="font-mono font-bold text-zinc-900">{selectedOrder.id}</span>
@@ -2315,13 +2338,57 @@ export default function AdminPage() {
                 <span className="text-zinc-500">Төлсөн дүн: </span>
                 <span className="font-mono font-bold text-emerald-700">{selectedOrder.totalAmountMNT.toLocaleString()}₮</span>
               </div>
+
+              {/* Customer Gmail for Google Drive Access */}
+              <div className="pt-2 border-t border-[#E6E6E3] flex flex-wrap items-center justify-between gap-2 bg-blue-50/60 -mx-3 -mb-3 p-3 rounded-b-xl">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-blue-900 block">
+                    Google Drive эрх нээх Gmail:
+                  </span>
+                  <span className="font-mono font-bold text-sm text-blue-950 select-all">
+                    {selectedOrder.customerEmail}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selectedOrder.customerEmail)
+                      setCopiedGmail(true)
+                      setTimeout(() => setCopiedGmail(false), 2000)
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-800 shadow-2xs cursor-pointer transition-colors"
+                  >
+                    {copiedGmail ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700 font-bold">Хуулагдлаа!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-zinc-600" />
+                        <span>Gmail хуулах</span>
+                      </>
+                    )}
+                  </button>
+                  <a
+                    href="https://drive.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>Drive нээх</span>
+                  </a>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3 text-xs mb-4">
               <div>
                 <label className="block text-[11px] font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
                   <Cloud className="w-3.5 h-3.5 text-[#0088CC]" />
-                  <span>Cloudflare R2 Key (Өндөр хурдны шууд таталт)</span>
+                  <span>Cloudflare R2 Key (Өндөр хурдны шууд таталт - Сонголтоор)</span>
                 </label>
                 <input
                   type="text"
@@ -2337,15 +2404,18 @@ export default function AdminPage() {
 
               <div>
                 <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  WeTransfer татах линк (Хэрэглэгчид очих нөөц эсвэл үндсэн линк)
+                  Google Drive / Татах холбоос (Хэрэглэгчид очих линк) *
                 </label>
                 <input
                   type="url"
                   value={weTransferInput}
                   onChange={(e) => setWeTransferInput(e.target.value)}
-                  placeholder="https://we.tl/t-xxxxxxxx"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                  placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
                 />
+                <p className="text-[10px] text-zinc-500 mt-1">
+                  💡 Google Drive дээр дээрх хэрэглэгчийн Gmail-д Share хийж хандах эрх нээгээд, фолдер эсвэл файлын холбоосоо энд хуулж тавина уу.
+                </p>
               </div>
 
               <div>
@@ -2372,7 +2442,7 @@ export default function AdminPage() {
                 <div className="text-xs">
                   <div className="font-bold text-blue-900 flex items-center gap-1.5">
                     <Mail className="w-3.5 h-3.5 text-[#0088CC]" />
-                    <span>Татах холбоосыг хэрэглэгчийн и-мэйл рүү илгээх</span>
+                    <span>Татах холбоосыг хэрэглэгчийн Gmail рүү илгээх</span>
                   </div>
                   <div className="text-blue-700 text-[11px] mt-0.5">
                     Хүлээн авагч: <span className="font-mono font-semibold">{selectedOrder.customerEmail}</span>

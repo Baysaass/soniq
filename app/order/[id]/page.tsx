@@ -301,9 +301,25 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                       }`}
                     >
                       <Download className="w-4 h-4 text-[#00B0FF]" />
-                      <span>{order.r2Key ? 'WETRANSFER ТАТАХ (НӨӨЦ ХОЛБООС)' : 'WETRANSFER-ЭЭР ТАТАЖ АВАХ'}</span>
+                      <span>
+                        {order.weTransferLink.includes('drive.google.com')
+                          ? (order.r2Key ? 'GOOGLE DRIVE ТАТАХ (НӨӨЦ ХОЛБООС)' : 'GOOGLE DRIVE-ААР ТАТАЖ АВАХ')
+                          : (order.r2Key ? 'WETRANSFER ТАТАХ (НӨӨЦ ХОЛБООС)' : 'WETRANSFER-ЭЭР ТАТАЖ АВАХ')}
+                      </span>
                       <ExternalLink className="w-3.5 h-3.5 ml-1" />
                     </a>
+
+                    {order.weTransferLink.includes('drive.google.com') && (
+                      <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-left text-xs text-blue-950 space-y-1">
+                        <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Google Drive хандах эрх нээгдсэн</span>
+                        </div>
+                        <p className="text-[11px] text-blue-800 leading-relaxed">
+                          Таны захиалга өгсөн <span className="font-mono font-bold text-blue-950 bg-blue-100/60 px-1 py-0.5 rounded">{order.customerEmail}</span> Gmail хаягт Google Drive-аар хандах эрх олгогдсон тул дээрх товч дээр дарж шууд татах эсвэл өөрийн Google Drive-даа хадгалж авна уу.
+                        </p>
+                      </div>
+                    )}
 
                     {!order.r2Key && (
                       <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
@@ -342,7 +358,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               <div className="mt-5 pt-4 border-t border-[#E6E6E3] grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-left w-full text-xs text-zinc-600">
                 <div className="bg-[#F7F7F5] p-2.5 rounded-lg border border-[#E6E6E3]">
                   <span className="font-bold text-zinc-800 block mb-0.5">1. Татах</span>
-                  WeTransfer дээр &apos;Download&apos; дарж татна.
+                  Google Drive / Cloud дээр &apos;Download&apos; дарж татна.
                 </div>
                 <div className="bg-[#F7F7F5] p-2.5 rounded-lg border border-[#E6E6E3]">
                   <span className="font-bold text-zinc-800 block mb-0.5">2. Задлах</span>
