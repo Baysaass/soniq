@@ -29,14 +29,42 @@ import { StoreProductCollage } from '@/components/store/store-product-collage'
 function ProductDetailContent({ slug }: { slug: string }) {
   const {
     products,
+    productsLoaded,
     ultimateBundle,
     openCheckoutWithProduct,
     addToCart,
     formatPrice,
   } = useStore()
 
-  const product = (products || []).find((p) => p.slug === slug) || (products && products.length > 0 ? products[0] : null)
+  const product = (products || []).find((p) => p.slug === slug)
   const bundle = ultimateBundle || ULTIMATE_BUNDLE
+
+  // If products are still loading and not yet in cache, show skeleton
+  if (!product && !productsLoaded) {
+    return (
+      <div className="min-h-screen bg-[#FAFAFA] text-[#141414] font-sans flex flex-col justify-between">
+        <div>
+          <StoreAnnouncementBar />
+          <StoreNavbar />
+          <main className="max-w-6xl mx-auto px-4 sm:px-6 py-10 animate-pulse">
+            <div className="h-4 bg-zinc-200 rounded w-1/4 mb-6" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              <div className="lg:col-span-7">
+                <div className="aspect-[16/10] bg-zinc-200 rounded-2xl" />
+              </div>
+              <div className="lg:col-span-5 space-y-4">
+                <div className="h-6 bg-zinc-200 rounded w-3/4" />
+                <div className="h-4 bg-zinc-100 rounded w-full" />
+                <div className="h-4 bg-zinc-100 rounded w-2/3" />
+                <div className="h-10 bg-zinc-200 rounded-xl mt-6" />
+              </div>
+            </div>
+          </main>
+        </div>
+        <StoreFooter />
+      </div>
+    )
+  }
 
   if (!product) {
     return (

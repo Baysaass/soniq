@@ -14,6 +14,13 @@ export function getActiveDBProvider(): DBProvider {
   return 'local'
 }
 
+let inMemoryProductsCache: { data: StoreProduct[]; timestamp: number } | null = null
+const CACHE_TTL_MS = 30_000 // 30 seconds high-speed memory cache
+
+export function invalidateProductsCache() {
+  inMemoryProductsCache = null
+}
+
 /**
  * Unified Database Interface
  * Automatically switches between Supabase, PostgreSQL, or Local storage based on environment variables.
@@ -23,25 +30,35 @@ export const db = {
     return getActiveDBProvider()
   },
 
-  async getProducts(): Promise<StoreProduct[]> {
+  async getProducts(forceFresh = false): Promise<StoreProduct[]> {
+    const now = Date.now()
+    if (!forceFresh && inMemoryProductsCache && (now - inMemoryProductsCache.timestamp < CACHE_TTL_MS)) {
+      return inMemoryProductsCache.data
+    }
+
     const provider = getActiveDBProvider()
+    let products: StoreProduct[] = []
+
     if (provider === 'supabase') {
       try {
-        return await supabaseDB.getProducts()
+        products = await supabaseDB.getProducts()
       } catch (err) {
         console.error('Supabase query failed, falling back to local:', err)
-        return localDB.getProducts()
+        products = localDB.getProducts()
       }
-    }
-    if (provider === 'postgres') {
+    } else if (provider === 'postgres') {
       try {
-        return await postgresDB.getProducts()
+        products = await postgresDB.getProducts()
       } catch (err) {
         console.error('PostgreSQL query failed, falling back to local:', err)
-        return localDB.getProducts()
+        products = localDB.getProducts()
       }
+    } else {
+      products = localDB.getProducts()
     }
-    return localDB.getProducts()
+
+    inMemoryProductsCache = { data: products, timestamp: now }
+    return products
   },
 
   async getProductById(id: string): Promise<StoreProduct | null> {
@@ -89,6 +106,7 @@ export const db = {
   },
 
   async createProduct(data: Partial<StoreProduct>): Promise<StoreProduct> {
+    invalidateProductsCache()
     const provider = getActiveDBProvider()
     if (provider === 'supabase') {
       try {
@@ -110,6 +128,7 @@ export const db = {
   },
 
   async updateProduct(id: string, updates: Partial<StoreProduct>): Promise<StoreProduct | null> {
+    invalidateProductsCache()
     const provider = getActiveDBProvider()
     if (provider === 'supabase') {
       try {
@@ -131,6 +150,7 @@ export const db = {
   },
 
   async deleteProduct(id: string): Promise<boolean> {
+    invalidateProductsCache()
     const provider = getActiveDBProvider()
     if (provider === 'supabase') {
       try {

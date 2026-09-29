@@ -1,15 +1,31 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, invalidateProductsCache } from '@/lib/db'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const products = await db.getProducts()
-    const ultimateBundle = await db.getUltimateBundle()
-    return NextResponse.json({
-      success: true,
-      products,
-      ultimateBundle,
-    })
+    const { searchParams } = new URL(req.url)
+    const forceFresh = searchParams.get('fresh') === '1'
+    if (forceFresh) {
+      invalidateProductsCache()
+    }
+
+    const products = await db.getProducts(forceFresh)
+    const ultimateBundle = products.find((p) => p.isBundle) || null
+
+    return NextResponse.json(
+      {
+        success: true,
+        products,
+        ultimateBundle,
+      },
+      {
+        headers: {
+          'Cache-Control': forceFresh
+            ? 'no-store, no-cache, must-revalidate'
+            : 'public, s-maxage=30, stale-while-revalidate=120',
+        },
+      }
+    )
   } catch (err: unknown) {
     const error = err as Error
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })

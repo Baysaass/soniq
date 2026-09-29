@@ -15,6 +15,7 @@ export type StoreSettingsState = typeof STORE_SETTINGS & {
 
 interface StoreContextType {
   products: StoreProduct[]
+  productsLoaded: boolean
   ultimateBundle: StoreProduct | null
   settings: StoreSettingsState
   refreshProducts: () => Promise<void>
@@ -42,9 +43,31 @@ interface StoreContextType {
 const StoreContext = createContext<StoreContextType | null>(null)
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [products, setProducts] = useState<StoreProduct[]>(STORE_PRODUCTS)
+  const [products, setProducts] = useState<StoreProduct[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('soniq_products_cache')
+        if (saved) {
+          const parsed = JSON.parse(saved)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        }
+      } catch {}
+    }
+    return STORE_PRODUCTS
+  })
+  const [productsLoaded, setProductsLoaded] = useState(false)
   const [ultimateBundle, setUltimateBundle] = useState<StoreProduct | null>(ULTIMATE_BUNDLE)
-  const [settings, setSettings] = useState<StoreSettingsState>(STORE_SETTINGS)
+  const [settings, setSettings] = useState<StoreSettingsState>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('soniq_settings_cache')
+        if (saved) {
+          return { ...STORE_SETTINGS, ...JSON.parse(saved) }
+        }
+      } catch {}
+    }
+    return STORE_SETTINGS
+  })
 
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartOpen, setIsCartOpen] = useState(false)
@@ -60,6 +83,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json()
         if (data.products && Array.isArray(data.products)) {
           setProducts(data.products)
+          try {
+            localStorage.setItem('soniq_products_cache', JSON.stringify(data.products))
+          } catch {}
         }
         if (data.ultimateBundle) {
           setUltimateBundle(data.ultimateBundle)
@@ -69,6 +95,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error('Failed to fetch dynamic products:', err)
+    } finally {
+      setProductsLoaded(true)
     }
   }, [])
 
@@ -78,14 +106,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json()
         if (data.settings) {
-          setSettings((prev) => ({
-            ...prev,
-            ...data.settings,
-            bankInfo: {
-              ...prev.bankInfo,
-              ...(data.settings.bankInfo || {}),
-            },
-          }))
+          setSettings((prev) => {
+            const next = {
+              ...prev,
+              ...data.settings,
+              bankInfo: {
+                ...prev.bankInfo,
+                ...(data.settings.bankInfo || {}),
+              },
+            }
+            try {
+              localStorage.setItem('soniq_settings_cache', JSON.stringify(next))
+            } catch {}
+            return next
+          })
         }
       }
     } catch (err) {
@@ -174,6 +208,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     <StoreContext.Provider
       value={{
         products,
+        productsLoaded,
         ultimateBundle,
         settings,
         refreshProducts,

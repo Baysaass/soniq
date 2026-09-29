@@ -42,6 +42,7 @@ import {
   Image as ImageIcon,
   Star,
   Layers,
+  Loader2,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
@@ -87,7 +88,18 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'settings'>('products')
 
   // Products State
-  const [products, setProducts] = useState<StoreProduct[]>([])
+  const [products, setProducts] = useState<StoreProduct[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('soniq_products_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        }
+      } catch {}
+    }
+    return []
+  })
   const [productsLoading, setProductsLoading] = useState(false)
   const [productSearch, setProductSearch] = useState('')
   const [productCategoryFilter, setProductCategoryFilter] = useState('all')
@@ -349,14 +361,18 @@ export default function AdminPage() {
   }
 
   // Fetch Products
-  const fetchProducts = async () => {
+  const fetchProducts = async (forceFresh = false) => {
     setProductsLoading(true)
     try {
-      const res = await fetch('/api/products')
+      const url = forceFresh ? '/api/products?fresh=1' : '/api/products'
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
-        if (data.products) {
+        if (data.products && Array.isArray(data.products)) {
           setProducts(data.products)
+          try {
+            localStorage.setItem('soniq_products_cache', JSON.stringify(data.products))
+          } catch {}
         }
       }
     } catch (err) {
@@ -701,7 +717,7 @@ export default function AdminPage() {
       }
 
       setIsProductModalOpen(false)
-      fetchProducts()
+      fetchProducts(true)
     } catch (err: unknown) {
       const error = err as Error
       setProductModalError(error.message)
@@ -746,7 +762,7 @@ export default function AdminPage() {
       }
 
       if (res.ok && data?.success) {
-        fetchProducts()
+        fetchProducts(true)
       } else {
         alert(data?.error || 'Бүтээгдэхүүн устгахад алдаа гарлаа.')
       }
@@ -768,7 +784,7 @@ export default function AdminPage() {
         }),
       })
       if (res.ok) {
-        fetchProducts()
+        fetchProducts(true)
       }
     } catch (err) {
       console.error(err)
@@ -1087,7 +1103,7 @@ export default function AdminPage() {
 
               <div className="flex items-center gap-2">
                 <button
-                  onClick={fetchProducts}
+                  onClick={() => fetchProducts(true)}
                   className="p-2 rounded-lg border border-[#E6E6E3] bg-white hover:bg-zinc-50 text-zinc-600 transition-colors cursor-pointer"
                   title="Шинэчлэх"
                 >
@@ -1157,7 +1173,16 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E6E6E3]">
-                    {filteredProducts.length === 0 ? (
+                    {productsLoading && filteredProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-16 text-center">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <Loader2 className="w-6 h-6 animate-spin text-[#0088CC]" />
+                            <p className="text-xs text-zinc-500 font-medium">Бүтээгдэхүүний санг уншиж байна...</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : filteredProducts.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="py-16 text-center">
                           <div className="max-w-sm mx-auto">

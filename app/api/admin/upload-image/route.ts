@@ -86,7 +86,54 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Try writing to public/uploads directory (works locally / standalone servers)
+    // 2. If Supabase is configured, upload to Supabase Storage (Free 1GB global CDN)
+    try {
+      const { getSupabaseClient } = await import('@/lib/db/supabase')
+      const supabase = getSupabaseClient()
+      if (supabase) {
+        const bucket = 'product-images'
+        let { error: uploadErr } = await supabase.storage
+          .from(bucket)
+          .upload(filename, buffer, {
+            contentType: 'image/webp',
+            cacheControl: '31536000',
+            upsert: true,
+          })
+
+        // If bucket doesn't exist, create it and retry
+        if (uploadErr && (uploadErr.message?.toLowerCase().includes('not found') || uploadErr.message?.toLowerCase().includes('bucket'))) {
+          await supabase.storage.createBucket(bucket, { public: true }).catch(() => null)
+          const retry = await supabase.storage
+            .from(bucket)
+            .upload(filename, buffer, {
+              contentType: 'image/webp',
+              cacheControl: '31536000',
+              upsert: true,
+            })
+          uploadErr = retry.error
+        }
+
+        if (!uploadErr) {
+          const { data: publicUrlData } = supabase.storage
+            .from(bucket)
+            .getPublicUrl(filename)
+
+          if (publicUrlData?.publicUrl) {
+            return NextResponse.json({
+              success: true,
+              url: publicUrlData.publicUrl,
+              filename,
+              storage: 'supabase',
+              sizeBytes: buffer.length,
+            })
+          }
+        }
+      }
+    } catch (sbStorageErr) {
+      console.warn('Supabase storage upload skipped or failed:', sbStorageErr)
+    }
+
+    // 3. Try writing to public/uploads directory (works locally / standalone servers)
     try {
       const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
       if (!fs.existsSync(uploadsDir)) {
@@ -103,7 +150,7 @@ export async function POST(req: NextRequest) {
         sizeBytes: buffer.length,
       })
     } catch (fsErr) {
-      // 3. In serverless / read-only filesystem environments without R2, return optimized DataURL
+      // 4. In serverless / read-only filesystem environments without R2 or Supabase storage, return optimized DataURL
       const returnDataUrl = dataUrl || `data:image/webp;base64,${buffer.toString('base64')}`
       return NextResponse.json({
         success: true,

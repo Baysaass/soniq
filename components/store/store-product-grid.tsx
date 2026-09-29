@@ -18,6 +18,7 @@ import { useStore } from '@/lib/store-context'
 export function StoreProductGrid() {
   const {
     products,
+    productsLoaded,
     addToCart,
     openCheckoutWithProduct,
     formatPrice,
@@ -102,8 +103,20 @@ export function StoreProductGrid() {
           ))}
         </div>
 
-        {/* Product Cards Grid OR Empty State */}
-        {filteredProducts.length === 0 ? (
+        {/* Product Cards Grid OR Loading Skeleton OR Empty State */}
+        {!productsLoaded && filteredProducts.length === 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="bg-white border border-[#E6E6E3] rounded-xl p-3 shadow-xs animate-pulse">
+                <div className="aspect-[16/10] rounded-lg bg-zinc-200 mb-2.5" />
+                <div className="h-2.5 bg-zinc-200 rounded w-1/3 mb-2" />
+                <div className="h-4 bg-zinc-200 rounded w-3/4 mb-1.5" />
+                <div className="h-3 bg-zinc-100 rounded w-full mb-3" />
+                <div className="h-8 bg-zinc-200 rounded-lg w-full mt-2" />
+              </div>
+            ))}
+          </div>
+        ) : filteredProducts.length === 0 ? (
           <div className="py-16 text-center border border-dashed border-[#E6E6E3] rounded-2xl bg-[#FAFAFA] p-8">
             <div className="w-12 h-12 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-3 text-zinc-400">
               <Search className="w-5 h-5" />

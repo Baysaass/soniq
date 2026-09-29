@@ -28,7 +28,7 @@ export async function convertImageFileToWebP(
   file: File,
   options: ConvertImageOptions = {}
 ): Promise<ConvertedWebPResult> {
-  const { maxWidth = 1600, maxHeight = 1600, quality = 0.85 } = options
+  const { maxWidth = 960, maxHeight = 960, quality = 0.75 } = options
 
   return new Promise((resolve, reject) => {
     // If not in a browser environment, throw error
