@@ -6,12 +6,8 @@ import { VALUE_MATRIX, ULTIMATE_BUNDLE } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
 
 export function StoreValueMatrix() {
-  const { ultimateBundle, openCheckoutWithProduct, formatPrice } = useStore()
-  const currentBundle = ultimateBundle || ULTIMATE_BUNDLE
-
-  if (!currentBundle) {
-    return null
-  }
+  // Түр хаасан: хэрэглэгчийн хүсэлтээр хэмнэлт & харьцуулалт хэсгийг түр хаав
+  return null
 
   return (
     <section id="matrix" className="py-8 sm:py-10 bg-[#FAFAFA] border-b border-[#E6E6E3]">

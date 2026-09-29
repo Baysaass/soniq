@@ -40,12 +40,6 @@ export function StoreNavbar() {
             <span>Бүх багцууд</span>
           </a>
           <a
-            href="/shop#matrix"
-            className="hover:text-[#141414] hover:bg-zinc-100 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
-          >
-            <span>Хэмнэлт</span>
-          </a>
-          <a
             href="/shop#faq"
             className="hover:text-[#141414] hover:bg-zinc-100 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1.5"
           >

@@ -29,8 +29,8 @@ export default function ShopPage() {
         {/* The Full Arsenal Catalog Grid with search & categories */}
         <StoreProductGrid />
 
-        {/* Value Matrix Comparison Table */}
-        <StoreValueMatrix />
+        {/* Value Matrix Comparison Table (Түр хаасан) */}
+        {/* <StoreValueMatrix /> */}
 
         {/* FAQ Accordion */}
         <StoreFAQ />
