@@ -200,8 +200,20 @@ export const postgresDB = {
     const pool = getPostgresPool()
     if (!pool) return null
     try {
-      const current = await this.getProductById(id)
-      if (!current) return null
+      let current = await this.getProductById(id)
+      if (!current && updates.slug) {
+        current = await this.getProductBySlug(updates.slug)
+      }
+      if (!current) {
+        current = await this.getProductBySlug(id)
+      }
+      if (!current) {
+        return this.createProduct({
+          ...updates,
+          id: id || `prod_${Date.now()}`,
+          slug: updates.slug || `pack-${Date.now()}`,
+        })
+      }
       const merged = { ...current, ...updates }
 
       const updateImgs = Array.isArray(merged.images) && merged.images.length > 0

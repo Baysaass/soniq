@@ -126,8 +126,20 @@ export const localDB = {
 
   updateProduct(id: string, updates: Partial<StoreProduct>): StoreProduct | null {
     const products = this.getProducts()
-    const index = products.findIndex((p) => p.id === id)
-    if (index === -1) return null
+    let index = products.findIndex((p) => p.id === id)
+    if (index === -1 && updates.slug) {
+      index = products.findIndex((p) => p.slug === updates.slug)
+    }
+    if (index === -1) {
+      index = products.findIndex((p) => p.slug === id)
+    }
+    if (index === -1) {
+      return this.createProduct({
+        ...updates,
+        id: id || `prod_${Date.now()}`,
+        slug: updates.slug || id || `pack-${Date.now()}`,
+      })
+    }
 
     const updatedProduct = {
       ...products[index],

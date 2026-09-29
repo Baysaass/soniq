@@ -99,6 +99,7 @@ export default function AdminPage() {
   const [savingProduct, setSavingProduct] = useState(false)
   const [uploadingProductImages, setUploadingProductImages] = useState(false)
   const [uploadProgressText, setUploadProgressText] = useState('')
+  const [showR2InModal, setShowR2InModal] = useState(false)
 
   // Orders State
   const [orders, setOrders] = useState<Order[]>([])
@@ -485,9 +486,9 @@ export default function AdminPage() {
 
   // Open Product Modal (New or Edit)
   const openNewProductModal = () => {
-    const tempId = `prod_${Date.now()}`
+    setShowR2InModal(false)
     setEditingProduct({
-      id: tempId,
+      id: '',
       title: '',
       slug: '',
       subtitle: '',
@@ -504,7 +505,7 @@ export default function AdminPage() {
       format: 'WAV 24-bit / 96kHz Lossless',
       features: ['Өндөр чанарын аудио сан', '100% Royalty Free арилжааны лиценз', 'Timeline руу шууд чирч тавих'],
       compatibility: ['Premiere Pro', 'DaVinci Resolve', 'CapCut', 'After Effects'],
-      defaultWeTransferLink: 'https://we.tl/t-soniq-pack',
+      defaultWeTransferLink: '',
       previewSoundType: 'whoosh',
       isBundle: false,
       sampleVideoUrl: '',
@@ -515,6 +516,7 @@ export default function AdminPage() {
   }
 
   const openEditProductModal = (prod: StoreProduct) => {
+    setShowR2InModal(Boolean(prod.r2Key))
     const currentImgs = Array.isArray(prod.images) && prod.images.length > 0
       ? prod.images.filter(Boolean)
       : (prod.image ? [prod.image] : ['/images/product-morph-3d.png'])
@@ -659,15 +661,16 @@ export default function AdminPage() {
     setSavingProduct(true)
 
     try {
-      const isEdit = Boolean(editingProduct.id)
-      const url = isEdit ? `/api/products/${editingProduct.id}` : '/api/products'
+      const isEdit = Boolean(editingProduct.id && editingProduct.id.trim())
+      const targetId = editingProduct.id ? encodeURIComponent(editingProduct.id.trim()) : ''
+      const url = isEdit ? `/api/products/${targetId}` : '/api/products'
       const method = isEdit ? 'PUT' : 'POST'
 
       const currentImgs = Array.isArray(editingProduct.images) && editingProduct.images.length > 0
         ? editingProduct.images.slice(0, 6)
         : (editingProduct.image ? [editingProduct.image] : ['/images/product-morph-3d.png'])
 
-      const res = await fetch(url, {
+      let res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -677,6 +680,20 @@ export default function AdminPage() {
           passcode,
         }),
       })
+
+      // If PUT returns 404 (product not found in DB), fallback to POST to create/save it cleanly
+      if (!res.ok && res.status === 404 && isEdit) {
+        res = await fetch('/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...editingProduct,
+            image: currentImgs[0] || '/images/product-morph-3d.png',
+            images: currentImgs,
+            passcode,
+          }),
+        })
+      }
 
       const data = await res.json()
       if (!res.ok || !data.success) {
@@ -2449,87 +2466,109 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Cloudflare R2 Direct Upload & Storage */}
-              <div className="p-3.5 bg-[#FAFAFA] rounded-xl border border-[#E6E6E3] space-y-3">
+              {/* Google Drive / Download Link - PRIMARY & DEFAULT */}
+              <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200/90 space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-semibold text-zinc-800 flex items-center gap-1.5">
-                    <Cloud className="w-3.5 h-3.5 text-[#0088CC]" />
-                    <span>Cloudflare R2 Файл Байршуулалт (1GB - 10GB+ Шууд Upload)</span>
+                  <label className="block text-[11px] font-bold text-blue-950 flex items-center gap-1.5">
+                    <ExternalLink className="w-3.5 h-3.5 text-[#0088CC]" />
+                    <span>Google Drive / Татах холбоос (Үндсэн хандалт) *</span>
                   </label>
-                  {editingProduct.r2Key ? (
-                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                      <Check className="w-3 h-3" />
-                      <span>R2 Файл холбогдсон</span>
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-zinc-400 font-mono">Шууд Browser → R2</span>
-                  )}
-                </div>
-
-                <R2FileUploader
-                  passcode={passcode}
-                  category={editingProduct.category || 'sfx'}
-                  currentKey={editingProduct.r2Key}
-                  onUploadSuccess={(key, size) => {
-                    setEditingProduct({
-                      ...editingProduct,
-                      r2Key: key,
-                      fileSize: size || editingProduct.fileSize,
-                      defaultWeTransferLink: editingProduct.defaultWeTransferLink || `https://r2.soniq.click/${key}`,
-                    })
-                  }}
-                  onOpenSettings={() => {
-                    setIsProductModalOpen(false)
-                    setActiveTab('settings')
-                  }}
-                />
-
-                <div className="pt-1">
-                  <label className="block text-[10px] font-semibold text-zinc-600 mb-1">
-                    Эсвэл R2 Object Key гараар тохируулах (Сонголттой):
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={editingProduct.r2Key || ''}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, r2Key: e.target.value })}
-                      placeholder="Жишээ: sfx/cinematic-braams-risers.zip"
-                      className="w-full px-3 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
-                    />
-                    {editingProduct.r2Key && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingProduct({ ...editingProduct, r2Key: '' })}
-                        className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs cursor-pointer shrink-0"
-                        title="R2 түлхүүр арилгах"
-                      >
-                        Арилгах
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-semibold text-zinc-700">
-                    Google Drive / Татах холбоос (Google Drive эсвэл WeTransfer)
-                  </label>
-                  <span className="text-[10px] text-zinc-400">
-                    {editingProduct.r2Key ? 'Сонголттой (R2 байгаа)' : 'R2 тохируулаагүй бол заавал *'}
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                    Үндсэн татах арга
                   </span>
                 </div>
                 <input
                   type="url"
-                  required={!editingProduct.r2Key}
+                  required
                   value={editingProduct.defaultWeTransferLink || ''}
                   onChange={(e) => setEditingProduct({ ...editingProduct, defaultWeTransferLink: e.target.value })}
                   placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                  className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
                 />
-                <p className="mt-1 text-[11px] text-zinc-500">
-                  💡 Google Drive дээрх хавтас эсвэл .zip файлынхаа &quot;Share&quot; товчийг дарж линкийг хуулж (Copy link) энд тавина уу.
+                <p className="text-[11px] text-blue-900/80 leading-relaxed">
+                  💡 <strong>Google Drive:</strong> Та зарах файлаа Google Drive-т хуулаад, тухайн хавтас эсвэл .zip файлынхаа &quot;Share&quot; линкийг энд тавина уу. Захиалагч төлбөрөө төлөхөд энэхүү холбоос очно.
                 </p>
+              </div>
+
+              {/* Cloudflare R2 - OPTIONAL COLLAPSIBLE */}
+              <div className="rounded-xl border border-[#E6E6E3] overflow-hidden bg-[#FAFAFA]">
+                <button
+                  type="button"
+                  onClick={() => setShowR2InModal(!showR2InModal)}
+                  className="w-full p-3 flex items-center justify-between text-left hover:bg-zinc-100/70 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Cloud className="w-4 h-4 text-[#0088CC]" />
+                    <span className="text-[11px] font-bold text-zinc-800">
+                      Cloudflare R2 сан холбох
+                    </span>
+                    <span className="text-[10px] text-zinc-400 font-normal">
+                      (Сонголттой / 1GB–10GB+ хэмжээтэй файл байршуулах үед л ашиглана)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {editingProduct.r2Key ? (
+                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                        <Check className="w-2.5 h-2.5" />
+                        <span>R2 холбогдсон</span>
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-zinc-500 font-semibold">
+                        {showR2InModal ? 'Хаах ▲' : 'Нээх ▼'}
+                      </span>
+                    )}
+                  </div>
+                </button>
+
+                {showR2InModal && (
+                  <div className="p-3.5 pt-0 border-t border-[#E6E6E3] space-y-3 mt-2">
+                    <p className="text-[10px] text-zinc-500">
+                      ⚠️ Хэрэв та дээр Google Drive холбоос оруулсан бол R2-ийг тохируулах шаардлагагүй (хоосон үлдээнэ үү).
+                    </p>
+                    <R2FileUploader
+                      passcode={passcode}
+                      category={editingProduct.category || 'sfx'}
+                      currentKey={editingProduct.r2Key}
+                      onUploadSuccess={(key, size) => {
+                        setEditingProduct({
+                          ...editingProduct,
+                          r2Key: key,
+                          fileSize: size || editingProduct.fileSize,
+                          defaultWeTransferLink: editingProduct.defaultWeTransferLink || `https://r2.soniq.click/${key}`,
+                        })
+                      }}
+                      onOpenSettings={() => {
+                        setIsProductModalOpen(false)
+                        setActiveTab('settings')
+                      }}
+                    />
+
+                    <div className="pt-1">
+                      <label className="block text-[10px] font-semibold text-zinc-600 mb-1">
+                        R2 Object Key гараар тохируулах (Сонголттой):
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={editingProduct.r2Key || ''}
+                          onChange={(e) => setEditingProduct({ ...editingProduct, r2Key: e.target.value })}
+                          placeholder="Жишээ: sfx/cinematic-braams-risers.zip"
+                          className="w-full px-3 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                        />
+                        {editingProduct.r2Key && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingProduct({ ...editingProduct, r2Key: '' })}
+                            className="px-2.5 py-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 rounded-lg text-xs cursor-pointer shrink-0"
+                            title="R2 түлхүүр арилгах"
+                          >
+                            Арилгах
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Sample Video Field */}

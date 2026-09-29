@@ -32,9 +32,15 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Нууц код буруу байна.' }, { status: 401 })
     }
 
-    const updated = await db.updateProduct(id, updates)
+    let updated = await db.updateProduct(id, updates)
+    if (!updated && updates.slug) {
+      updated = await db.updateProduct(updates.slug, updates)
+    }
     if (!updated) {
-      return NextResponse.json({ success: false, error: 'Бүтээгдэхүүн олдсонгүй.' }, { status: 404 })
+      updated = await db.createProduct({ ...updates, id })
+    }
+    if (!updated) {
+      return NextResponse.json({ success: false, error: 'Бүтээгдэхүүн хадгалахад алдаа гарлаа.' }, { status: 400 })
     }
 
     return NextResponse.json({ success: true, product: updated })

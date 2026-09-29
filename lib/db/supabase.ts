@@ -246,13 +246,51 @@ export const supabaseDB = {
   async updateProduct(id: string, updates: Partial<StoreProduct>): Promise<StoreProduct | null> {
     const supabase = getSupabaseClient()
     if (!supabase) return null
+
+    const targetId = (id || '').trim()
+    const targetSlug = (updates.slug || id || '').trim()
     const row = mapProductToRow(updates)
-    const { data, error } = await supabase.from('products').update(row).eq('id', id).select('*').single()
-    if (error) {
-      console.error('Supabase updateProduct error:', error)
-      throw new Error(error.message)
+
+    // Never overwrite primary key with empty/undefined
+    delete row.id
+
+    // 1. Try updating by id
+    if (targetId) {
+      const { data, error } = await supabase
+        .from('products')
+        .update(row)
+        .eq('id', targetId)
+        .select('*')
+        .maybeSingle()
+
+      if (data && !error) return mapProductRow(data)
     }
-    return mapProductRow(data)
+
+    // 2. Try updating by slug
+    if (targetSlug) {
+      const { data, error } = await supabase
+        .from('products')
+        .update(row)
+        .eq('slug', targetSlug)
+        .select('*')
+        .maybeSingle()
+
+      if (data && !error) return mapProductRow(data)
+    }
+
+    // 3. Fallback: Upsert product if not found
+    try {
+      const newProduct = await this.createProduct({
+        ...updates,
+        id: targetId || `prod_${Date.now()}`,
+        slug: targetSlug || `pack-${Date.now()}`,
+      })
+      if (newProduct) return newProduct
+    } catch (createErr) {
+      console.error('Supabase fallback createProduct failed:', createErr)
+    }
+
+    return null
   },
 
   async deleteProduct(id: string): Promise<boolean> {
