@@ -1705,7 +1705,7 @@ export default function AdminPage() {
               {/* Default WeTransfer link */}
               <div>
                 <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Анхдагч WeTransfer татах линк (Fallback link)
+                  Анхдагч татах линк (Google Drive / WeTransfer fallback)
                 </label>
                 <input
                   type="url"
@@ -2385,6 +2385,9 @@ export default function AdminPage() {
                   placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
                   className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
                 />
+                <p className="mt-1 text-[11px] text-zinc-500">
+                  💡 Google Drive дээрх хавтас эсвэл .zip файлынхаа &quot;Share&quot; товчийг дарж линкийг хуулж (Copy link) энд тавина уу.
+                </p>
               </div>
 
               {/* Sample Video Field */}
