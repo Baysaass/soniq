@@ -269,6 +269,321 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * Builds responsive HTML email template for initial Order Creation (Payment Instructions)
+ */
+export function buildOrderCreatedEmailHtml(params: {
+  order: Order
+  siteUrl: string
+}): string {
+  const { order, siteUrl } = params
+  const orderPageUrl = `${siteUrl}/order/${order.id}`
+
+  const itemsHtml = (order.items || [])
+    .map(
+      (item) => `
+      <tr style="border-bottom: 1px solid #27272a;">
+        <td style="padding: 12px 0; color: #f4f4f5; font-size: 14px; font-weight: 600;">
+          ${escapeHtml(item.title)}
+          <div style="font-size: 12px; color: #a1a1aa; font-weight: normal; margin-top: 2px;">
+            ${item.quantity > 1 ? `Тоо хэмжээ: ${item.quantity} · ` : ''}Лиценз: 100% Commercial Royalty-Free
+          </div>
+        </td>
+        <td style="padding: 12px 0; color: #f4f4f5; font-size: 14px; text-align: right; font-family: monospace; font-weight: bold;">
+          ${order.currency === 'USD' ? `$${(item.priceUSD || 0).toFixed(2)}` : `${(item.price || 0).toLocaleString()}₮`}
+        </td>
+      </tr>
+    `
+    )
+    .join('')
+
+  return `
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Захиалга хүлээн авлаа — SONIQ STORE</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0c0d0e; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f4f4f5; -webkit-font-smoothing: antialiased;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 32px 20px;">
+    
+    <!-- Header -->
+    <div style="text-align: center; margin-bottom: 28px;">
+      <div style="display: inline-block; padding: 6px 14px; border-radius: 9999px; background: #18191b; border: 1px solid #27272a; margin-bottom: 16px;">
+        <span style="font-size: 11px; font-weight: 800; letter-spacing: 0.08em; color: #00B0FF; text-transform: uppercase;">
+          ⚡ SONIQ DIGITAL STORE
+        </span>
+      </div>
+      <h1 style="font-size: 24px; font-weight: 800; color: #ffffff; margin: 0 0 8px 0; letter-spacing: -0.02em;">
+        Захиалгыг хүлээн авлаа! 📥
+      </h1>
+      <p style="font-size: 14px; color: #a1a1aa; margin: 0; line-height: 1.5;">
+        Сайн байна уу, <strong style="color: #ffffff;">${escapeHtml(order.customerName)}</strong>? Таны захиалгыг системд амжилттай бүртгэлээ.
+      </p>
+    </div>
+
+    <!-- Main Card -->
+    <div style="background: #141517; border: 1px solid #27272a; border-radius: 16px; padding: 28px 24px; margin-bottom: 24px;">
+      
+      <!-- Order Code Banner -->
+      <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid #27272a; margin-bottom: 20px;">
+        <div>
+          <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; font-weight: 700;">
+            Захиалгын дугаар
+          </span>
+          <div style="font-size: 18px; font-weight: 800; color: #00B0FF; font-family: monospace; margin-top: 2px;">
+            ${order.id}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #71717a; font-weight: 700;">
+            Төлөв
+          </span>
+          <div style="font-size: 13px; font-weight: 700; color: #f59e0b; margin-top: 2px;">
+            ⏳ ТӨЛБӨР ШАЛГАГДАЖ БАЙНА
+          </div>
+        </div>
+      </div>
+
+      <!-- Bank Transfer Box -->
+      <div style="background: #1c1d21; border: 1px solid #3f3f46; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <div style="font-size: 12px; font-weight: 800; color: #00B0FF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+          🏦 Дансаар шилжүүлэх заавар:
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Банк:</td>
+            <td style="padding: 6px 0; color: #ffffff; font-weight: 700; text-align: right;">Хаан Банк (Khan Bank)</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Дансны дугаар:</td>
+            <td style="padding: 6px 0; color: #00B0FF; font-family: monospace; font-size: 15px; font-weight: 900; text-align: right;">5608120471</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Хүлээн авагч:</td>
+            <td style="padding: 6px 0; color: #ffffff; font-weight: 700; text-align: right;">Өсөхбаяр</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Гүйлгээний утга:</td>
+            <td style="padding: 6px 0; color: #f59e0b; font-family: monospace; font-size: 14px; font-weight: 900; text-align: right;">${order.transferReference || order.id}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Нийт дүн:</td>
+            <td style="padding: 6px 0; color: #10b981; font-family: monospace; font-size: 16px; font-weight: 900; text-align: right;">
+              ${order.currency === 'USD' ? `$${(order.totalAmountUSD || 0).toFixed(2)}` : `${(order.totalAmountMNT || 0).toLocaleString()}₮`}
+            </td>
+          </tr>
+        </table>
+        
+        <div style="font-size: 11px; color: #71717a; margin-top: 12px; border-top: 1px dashed #3f3f46; padding-top: 10px; line-height: 1.4;">
+          ⚠️ Анхаар: Гүйлгээний утга дээр зөвхөн захиалгын код болох <strong style="color: #ffffff;">${order.transferReference || order.id}</strong> утгыг бичиж шилжүүлнэ үү.
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <div style="text-align: center; margin: 24px 0 20px 0;">
+        <a href="${orderPageUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; width: 100%; box-sizing: border-box; background: linear-gradient(135deg, #00B0FF 0%, #0088CC 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 800; padding: 15px 24px; border-radius: 12px; text-align: center;">
+          🔍 Захиалгын төлөв харах
+        </a>
+      </div>
+
+      <!-- Order Items Summary Table -->
+      <div style="margin-top: 20px;">
+        <div style="font-size: 12px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+          Захиалсан багцууд
+        </div>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- Instructions Banner -->
+    <div style="background: #141517; border: 1px solid #27272a; border-radius: 12px; padding: 18px; margin-bottom: 24px; font-size: 13px; line-height: 1.6; color: #a1a1aa;">
+      <div style="color: #ffffff; font-weight: 700; margin-bottom: 4px; font-size: 13px;">
+        💡 Төлбөр төлсний дараа:
+      </div>
+      <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
+        Манай админ таны Хаан банкны гүйлгээг шалгаж баталгаажуулмагц таны энэхүү <strong style="color: #ffffff;">${escapeHtml(order.customerEmail)}</strong> и-мэйл рүү <strong>Google Drive татах холбоос</strong> автоматаар очих болно. Мөн та дээрх товч дээр дарж захиалгынхаа хуудаснаас шууд татах боломжтой.
+      </p>
+    </div>
+
+    <!-- Support & Footer -->
+    <div style="text-align: center; color: #71717a; font-size: 12px; line-height: 1.6;">
+      <p style="margin: 0 0 8px 0;">
+        Холбоо барих:
+        Instagram: <a href="https://www.instagram.com/_baysaa_notfound/" style="color: #00B0FF; text-decoration: none;">@_baysaa_notfound</a> · 
+        Telegram: <a href="https://t.me/baysaa_vfx" style="color: #00B0FF; text-decoration: none;">@baysaa_vfx</a>
+      </p>
+      <p style="margin: 0; color: #52525b; font-size: 11px;">
+        © 2026 SONIQ STORE (shop.soniq.click). Бүх эрх хуулиар хамгаалагдсан.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>
+`
+}
+
+/**
+ * Resilient Resend delivery helper with automatic domain fallback
+ */
+async function sendViaResend(params: {
+  apiKey: string
+  to: string
+  subject: string
+  html: string
+}): Promise<{ success: boolean; messageId?: string; error?: string; fromUsed?: string }> {
+  const configuredFrom = process.env.EMAIL_FROM?.trim()
+  // Candidates in priority order:
+  // If user configured EMAIL_FROM, try it first, then fallback to onboarding@resend.dev if unverified domain error occurs
+  const candidates: string[] = []
+  if (configuredFrom) {
+    candidates.push(configuredFrom)
+  }
+  if (!candidates.includes('SONIQ STORE <onboarding@resend.dev>')) {
+    candidates.push('SONIQ STORE <onboarding@resend.dev>')
+  }
+  if (!candidates.includes('SONIQ STORE <order@soniq.click>')) {
+    candidates.push('SONIQ STORE <order@soniq.click>')
+  }
+
+  let lastError = ''
+  for (const fromAddress of candidates) {
+    try {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${params.apiKey.trim()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [params.to.trim()],
+          subject: params.subject,
+          html: params.html,
+        }),
+      })
+
+      const resData = await res.json()
+      if (res.ok && resData.id) {
+        return { success: true, messageId: resData.id, fromUsed: fromAddress }
+      }
+
+      lastError = resData?.message || resData?.error || `HTTP ${res.status}`
+      console.warn(`Resend attempt failed with from="${fromAddress}":`, lastError)
+
+      // If the error indicates domain is not verified, try next candidate (onboarding@resend.dev)
+      const isDomainIssue =
+        lastError.toLowerCase().includes('domain') ||
+        lastError.toLowerCase().includes('not verified') ||
+        lastError.toLowerCase().includes('verify')
+
+      if (!isDomainIssue && candidates.indexOf(fromAddress) === 0 && !configuredFrom) {
+        // If not domain issue and no custom config, continue trying
+        continue
+      }
+    } catch (e: any) {
+      lastError = e?.message || 'Network error'
+    }
+  }
+
+  return { success: false, error: lastError }
+}
+
+/**
+ * Dispatcher to send Order Created (Confirmation & Bank Instructions) Email immediately upon checkout
+ */
+export async function sendOrderCreatedEmail(params: {
+  order: Order
+  siteUrl?: string
+}): Promise<EmailSendResult> {
+  const { order } = params
+
+  if (!order.customerEmail || !order.customerEmail.includes('@')) {
+    return {
+      success: false,
+      provider: 'simulated',
+      recipient: order.customerEmail || 'unknown',
+      error: 'Хэрэглэгчийн и-мэйл хаяг тодорхойгүй байна.',
+    }
+  }
+
+  const siteUrl =
+    params.siteUrl ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.NODE_ENV === 'production' ? 'https://shop.soniq.click' : 'http://localhost:3000')
+
+  const html = buildOrderCreatedEmailHtml({ order, siteUrl })
+  const subject = `[SONIQ STORE] Захиалга хүлээн авлаа — Төлбөрийн заавар (#${order.id})`
+
+  const resendApiKey = process.env.RESEND_API_KEY
+  if (resendApiKey && resendApiKey.trim().length > 0) {
+    const res = await sendViaResend({
+      apiKey: resendApiKey,
+      to: order.customerEmail,
+      subject,
+      html,
+    })
+
+    if (res.success && res.messageId) {
+      saveEmailLog({
+        id: res.messageId,
+        orderId: order.id,
+        recipient: order.customerEmail,
+        subject,
+        sentAt: new Date().toISOString(),
+        provider: 'resend',
+        success: true,
+        html,
+      })
+      return {
+        success: true,
+        provider: 'resend',
+        messageId: res.messageId,
+        recipient: order.customerEmail,
+        previewHtml: html,
+      }
+    } else {
+      const errorMsg = res.error || 'Resend и-мэйл илгээхэд алдаа буцаалаа.'
+      saveEmailLog({
+        id: `err_${Date.now()}`,
+        orderId: order.id,
+        recipient: order.customerEmail,
+        subject,
+        sentAt: new Date().toISOString(),
+        provider: 'resend-failed',
+        success: false,
+        error: errorMsg,
+        html,
+      })
+      return {
+        success: false,
+        provider: 'resend-failed',
+        error: errorMsg,
+        recipient: order.customerEmail,
+        previewHtml: html,
+      }
+    }
+  }
+
+  const mockId = `sim_${Date.now()}`
+  return {
+    success: false,
+    provider: 'not-configured',
+    error: 'RESEND_API_KEY тохируулагдаагүй байна.',
+    messageId: mockId,
+    recipient: order.customerEmail,
+    previewHtml: html,
+  }
+}
+
+/**
  * Main dispatcher to send Order Approved Email with download links
  */
 export async function sendOrderApprovedEmail(params: {
@@ -294,7 +609,7 @@ export async function sendOrderApprovedEmail(params: {
     process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.NODE_ENV === 'production' ? 'https://shop.soniq.click' : 'http://localhost:3000')
 
-  // Resolve WeTransfer link
+  // Resolve WeTransfer / Google Drive link
   const weTransferUrl =
     customWeTransferLink ||
     order.weTransferLink ||
@@ -338,71 +653,49 @@ export async function sendOrderApprovedEmail(params: {
   // 1. Try Resend if RESEND_API_KEY is configured
   const resendApiKey = process.env.RESEND_API_KEY
   if (resendApiKey && resendApiKey.trim().length > 0) {
-    const fromAddress = (process.env.EMAIL_FROM || 'SONIQ STORE <order@soniq.click>').trim()
+    const res = await sendViaResend({
+      apiKey: resendApiKey,
+      to: order.customerEmail,
+      subject,
+      html,
+    })
 
-    try {
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${resendApiKey.trim()}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          from: fromAddress,
-          to: [order.customerEmail.trim()],
-          subject,
-          html,
-        }),
+    if (res.success && res.messageId) {
+      saveEmailLog({
+        id: res.messageId,
+        orderId: order.id,
+        recipient: order.customerEmail,
+        subject,
+        sentAt: new Date().toISOString(),
+        provider: 'resend',
+        success: true,
+        html,
       })
-
-      const resData = await res.json()
-      if (res.ok && resData.id) {
-        saveEmailLog({
-          id: resData.id,
-          orderId: order.id,
-          recipient: order.customerEmail,
-          subject,
-          sentAt: new Date().toISOString(),
-          provider: 'resend',
-          success: true,
-          html,
-        })
-        return {
-          success: true,
-          provider: 'resend',
-          messageId: resData.id,
-          recipient: order.customerEmail,
-          previewHtml: html,
-        }
-      } else {
-        const errorMsg = resData?.message || resData?.error || 'Resend и-мэйл илгээхэд алдаа буцаалаа.'
-        console.error('Resend API rejected email delivery:', resData)
-        saveEmailLog({
-          id: `err_${Date.now()}`,
-          orderId: order.id,
-          recipient: order.customerEmail,
-          subject,
-          sentAt: new Date().toISOString(),
-          provider: 'resend-failed',
-          success: false,
-          error: errorMsg,
-          html,
-        })
-        return {
-          success: false,
-          provider: 'resend-failed',
-          error: errorMsg,
-          recipient: order.customerEmail,
-          previewHtml: html,
-        }
+      return {
+        success: true,
+        provider: 'resend',
+        messageId: res.messageId,
+        recipient: order.customerEmail,
+        previewHtml: html,
       }
-    } catch (err: unknown) {
-      const error = err as Error
-      console.error('Resend send exception:', error.message)
+    } else {
+      const errorMsg = res.error || 'Resend и-мэйл илгээхэд алдаа буцаалаа.'
+      console.error('Resend API rejected email delivery:', errorMsg)
+      saveEmailLog({
+        id: `err_${Date.now()}`,
+        orderId: order.id,
+        recipient: order.customerEmail,
+        subject,
+        sentAt: new Date().toISOString(),
+        provider: 'resend-failed',
+        success: false,
+        error: errorMsg,
+        html,
+      })
       return {
         success: false,
         provider: 'resend-failed',
-        error: error.message,
+        error: errorMsg,
         recipient: order.customerEmail,
         previewHtml: html,
       }

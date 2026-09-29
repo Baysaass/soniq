@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendTelegramOrderNotification } from '@/lib/telegram'
+import { sendOrderCreatedEmail } from '@/lib/email-service'
 
 export async function POST(request: Request) {
   try {
@@ -77,6 +78,12 @@ export async function POST(request: Request) {
     // Dispatch Telegram notification (non-blocking)
     sendTelegramOrderNotification(order).catch((err) => {
       console.warn('Telegram notification background warning:', err)
+    })
+
+    // Dispatch Customer Order Confirmation Email (non-blocking)
+    const siteUrl = new URL(request.url).origin
+    sendOrderCreatedEmail({ order, siteUrl }).catch((err) => {
+      console.warn('Order confirmation email background warning:', err)
     })
 
     return NextResponse.json({
