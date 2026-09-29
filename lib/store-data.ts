@@ -12,6 +12,7 @@ export interface StoreProduct {
   priceUSD: number
   originalPriceUSD: number
   image: string
+  images?: string[]
   features: string[]
   compatibility: string[]
   format: string

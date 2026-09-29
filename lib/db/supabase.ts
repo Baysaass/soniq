@@ -36,6 +36,22 @@ export function getSupabaseClient(): SupabaseClient | null {
 
 // Convert DB snake_case row to CamelCase StoreProduct
 function mapProductRow(row: any): StoreProduct {
+  let images: string[] = []
+  if (Array.isArray(row.images)) {
+    images = row.images.filter(Boolean)
+  } else if (typeof row.image === 'string' && row.image.includes('|||')) {
+    images = row.image.split('|||').map((s: string) => s.trim()).filter(Boolean)
+  } else if (typeof row.image === 'string' && row.image.startsWith('[') && row.image.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(row.image)
+      if (Array.isArray(parsed)) images = parsed.filter(Boolean)
+    } catch {}
+  } else if (row.image) {
+    images = [row.image]
+  }
+
+  const primaryImage = images[0] || row.image || '/images/product-morph-3d.png'
+
   return {
     id: row.id,
     slug: row.slug,
@@ -49,7 +65,8 @@ function mapProductRow(row: any): StoreProduct {
     originalPriceMNT: Number(row.original_price_mnt) || 0,
     priceUSD: Number(row.price_usd) || 0,
     originalPriceUSD: Number(row.original_price_usd) || 0,
-    image: row.image || '/images/product-morph-3d.png',
+    image: primaryImage,
+    images: images.length > 0 ? images.slice(0, 6) : [primaryImage],
     features: Array.isArray(row.features) ? row.features : [],
     compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
     format: row.format || 'WAV Lossless',
@@ -79,7 +96,12 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
   if (prod.originalPriceMNT !== undefined) row.original_price_mnt = prod.originalPriceMNT
   if (prod.priceUSD !== undefined) row.price_usd = prod.priceUSD
   if (prod.originalPriceUSD !== undefined) row.original_price_usd = prod.originalPriceUSD
-  if (prod.image !== undefined) row.image = prod.image
+  if (prod.images !== undefined || prod.image !== undefined) {
+    const list = Array.isArray(prod.images) && prod.images.length > 0
+      ? prod.images.slice(0, 6)
+      : (prod.image ? [prod.image] : [])
+    row.image = list.length > 1 ? list.join('|||') : (list[0] || prod.image || '/images/product-morph-3d.png')
+  }
   if (prod.features !== undefined) row.features = prod.features
   if (prod.compatibility !== undefined) row.compatibility = prod.compatibility
   if (prod.format !== undefined) row.format = prod.format

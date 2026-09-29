@@ -34,7 +34,10 @@ export const localDB = {
         if (content) {
           const parsed = JSON.parse(content)
           if (Array.isArray(parsed)) {
-            productsCache = parsed
+            productsCache = parsed.map((p) => ({
+              ...p,
+              images: Array.isArray(p.images) && p.images.length > 0 ? p.images.slice(0, 6) : (p.image ? [p.image] : []),
+            }))
             return productsCache
           }
         }
@@ -98,7 +101,8 @@ export const localDB = {
       originalPriceMNT: Number(data.originalPriceMNT) || 89000,
       priceUSD: Number(data.priceUSD) || 9.99,
       originalPriceUSD: Number(data.originalPriceUSD) || 29.0,
-      image: data.image || '/images/product-morph-3d.png',
+      image: data.image || (Array.isArray(data.images) && data.images[0]) || '/images/product-morph-3d.png',
+      images: Array.isArray(data.images) && data.images.length > 0 ? data.images.slice(0, 6) : (data.image ? [data.image] : []),
       features: Array.isArray(data.features) ? data.features : ['Өндөр чанарын аудио сан', '100% Royalty Free'],
       compatibility:
         Array.isArray(data.compatibility) && data.compatibility.length > 0

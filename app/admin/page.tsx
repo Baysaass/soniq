@@ -38,10 +38,18 @@ import {
   Mail,
   Send,
   Copy,
+  Upload,
+  Image as ImageIcon,
+  Star,
+  Layers,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
 import { STORE_SETTINGS, StoreProduct } from '@/lib/store-data'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
 import { R2FileUploader } from '@/components/admin/r2-file-uploader'
+import { convertImageFileToWebP } from '@/lib/image-utils'
+import { renderCollageGrid } from '@/components/store/store-product-collage'
 import type { Order } from '@/lib/orders-db'
 
 interface StoreSettingsState {
@@ -89,6 +97,8 @@ export default function AdminPage() {
   const [editingProduct, setEditingProduct] = useState<Partial<StoreProduct> | null>(null)
   const [productModalError, setProductModalError] = useState('')
   const [savingProduct, setSavingProduct] = useState(false)
+  const [uploadingProductImages, setUploadingProductImages] = useState(false)
+  const [uploadProgressText, setUploadProgressText] = useState('')
 
   // Orders State
   const [orders, setOrders] = useState<Order[]>([])
@@ -489,6 +499,7 @@ export default function AdminPage() {
       priceUSD: 9.99,
       originalPriceUSD: 29.0,
       image: '/images/product-morph-3d.png',
+      images: ['/images/product-morph-3d.png'],
       fileSize: '1.2 GB',
       format: 'WAV 24-bit / 96kHz Lossless',
       features: ['Өндөр чанарын аудио сан', '100% Royalty Free арилжааны лиценз', 'Timeline руу шууд чирч тавих'],
@@ -504,9 +515,134 @@ export default function AdminPage() {
   }
 
   const openEditProductModal = (prod: StoreProduct) => {
-    setEditingProduct({ ...prod })
+    const currentImgs = Array.isArray(prod.images) && prod.images.length > 0
+      ? prod.images.filter(Boolean)
+      : (prod.image ? [prod.image] : ['/images/product-morph-3d.png'])
+    setEditingProduct({
+      ...prod,
+      image: currentImgs[0] || '/images/product-morph-3d.png',
+      images: currentImgs,
+    })
     setProductModalError('')
     setIsProductModalOpen(true)
+  }
+
+  // Handle uploading product images with client-side WebP conversion
+  const handleUploadProductImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const currentImages = Array.isArray(editingProduct?.images) && editingProduct.images.length > 0
+      ? [...editingProduct.images]
+      : (editingProduct?.image ? [editingProduct.image] : [])
+
+    if (currentImages.length >= 6) {
+      alert('Нэг бүтээгдэхүүнд дээд тал нь 6 зураг оруулах боломжтой.')
+      e.target.value = ''
+      return
+    }
+
+    const remainingSlots = 6 - currentImages.length
+    const filesToProcess = Array.from(files).slice(0, remainingSlots)
+
+    setUploadingProductImages(true)
+    setUploadProgressText(`0 / ${filesToProcess.length} зургийг WebP руу хөрвүүлж байна...`)
+
+    const newUploadedUrls: string[] = []
+    const activePasscode = passcode || (typeof window !== 'undefined' ? sessionStorage.getItem('soniq_admin_passcode') : '') || ''
+
+    try {
+      for (let i = 0; i < filesToProcess.length; i++) {
+        const file = filesToProcess[i]
+        setUploadProgressText(`${i + 1} / ${filesToProcess.length}: "${file.name}" зургийг WebP руу хөрвүүлж байна...`)
+
+        // Convert to WebP in browser canvas
+        const webpResult = await convertImageFileToWebP(file, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          quality: 0.85,
+        })
+
+        // Upload to server endpoint
+        const formData = new FormData()
+        formData.append('file', webpResult.file)
+        formData.append('passcode', activePasscode)
+
+        const res = await fetch('/api/admin/upload-image', {
+          method: 'POST',
+          headers: {
+            'x-admin-passcode': activePasscode,
+          },
+          body: formData,
+        })
+
+        const data = await res.json()
+        if (res.ok && data.url) {
+          newUploadedUrls.push(data.url)
+        } else {
+          // Fallback to dataUrl if server returned an issue
+          newUploadedUrls.push(webpResult.dataUrl)
+        }
+      }
+
+      // Merge and limit to 6
+      const mergedImages = [...currentImages, ...newUploadedUrls].slice(0, 6)
+      setEditingProduct((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          image: mergedImages[0] || prev.image || '/images/product-morph-3d.png',
+          images: mergedImages,
+        }
+      })
+    } catch (err: any) {
+      console.error('Failed to process and upload images:', err)
+      alert(`Зураг хөрвүүлэхэд алдаа гарлаа: ${err?.message || 'Сүлжээний алдаа'}`)
+    } finally {
+      setUploadingProductImages(false)
+      setUploadProgressText('')
+      e.target.value = ''
+    }
+  }
+
+  const handleSetPrimaryImage = (index: number) => {
+    if (!editingProduct) return
+    const current = Array.isArray(editingProduct.images) ? [...editingProduct.images] : (editingProduct.image ? [editingProduct.image] : [])
+    if (index <= 0 || index >= current.length) return
+    const [selected] = current.splice(index, 1)
+    current.unshift(selected)
+    setEditingProduct({
+      ...editingProduct,
+      image: current[0],
+      images: current,
+    })
+  }
+
+  const handleRemoveProductImage = (index: number) => {
+    if (!editingProduct) return
+    const current = Array.isArray(editingProduct.images) ? [...editingProduct.images] : (editingProduct.image ? [editingProduct.image] : [])
+    current.splice(index, 1)
+    const fallback = current.length > 0 ? current[0] : '/images/product-morph-3d.png'
+    setEditingProduct({
+      ...editingProduct,
+      image: fallback,
+      images: current.length > 0 ? current : [fallback],
+    })
+  }
+
+  const handleMoveProductImage = (index: number, direction: 'left' | 'right') => {
+    if (!editingProduct) return
+    const current = Array.isArray(editingProduct.images) ? [...editingProduct.images] : (editingProduct.image ? [editingProduct.image] : [])
+    const newIdx = direction === 'left' ? index - 1 : index + 1
+    if (newIdx < 0 || newIdx >= current.length) return
+    const temp = current[index]
+    current[index] = current[newIdx]
+    current[newIdx] = temp
+    setEditingProduct({
+      ...editingProduct,
+      image: current[0],
+      images: current,
+    })
   }
 
   // Save Product (Create or Update)
@@ -527,11 +663,17 @@ export default function AdminPage() {
       const url = isEdit ? `/api/products/${editingProduct.id}` : '/api/products'
       const method = isEdit ? 'PUT' : 'POST'
 
+      const currentImgs = Array.isArray(editingProduct.images) && editingProduct.images.length > 0
+        ? editingProduct.images.slice(0, 6)
+        : (editingProduct.image ? [editingProduct.image] : ['/images/product-morph-3d.png'])
+
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...editingProduct,
+          image: currentImgs[0] || '/images/product-morph-3d.png',
+          images: currentImgs,
           passcode,
         }),
       })
@@ -2443,17 +2585,189 @@ export default function AdminPage() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Зургийн холбоос (Image URL)
-                </label>
-                <input
-                  type="text"
-                  value={editingProduct.image || ''}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })}
-                  placeholder="/images/product-morph-3d.png"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
-                />
+              {/* Product Images & Collage Section (Max 6) */}
+              <div className="p-3.5 bg-[#FAFAFA] rounded-xl border border-[#E6E6E3] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-800 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-[#0088CC]" />
+                      <span>Бүтээгдэхүүний зургууд & Collage (Дээд тал нь 6 зураг)</span>
+                    </label>
+                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                      Компьютерээсээ зураг оруулахад автоматаар <strong>.webp</strong> формат руу шахагдаж хөрвөнө. Олон зураг оруулбал дэлгүүр дээр <strong>Collage</strong> хэлбэрээр харагдана.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold shrink-0">
+                    {(editingProduct.images?.length || (editingProduct.image ? 1 : 0))}/6 зураг
+                  </span>
+                </div>
+
+                {/* Upload Button & Drop Zone */}
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <label className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 border-dashed transition-all cursor-pointer text-xs font-semibold ${
+                    (editingProduct.images?.length || 0) >= 6
+                      ? 'border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed'
+                      : 'border-blue-300 hover:border-blue-500 bg-blue-50/50 hover:bg-blue-50 text-[#0088CC]'
+                  }`}>
+                    <Upload className="w-4 h-4 shrink-0" />
+                    <span>
+                      {uploadingProductImages
+                        ? uploadProgressText || 'WebP руу хөрвүүлж байна...'
+                        : (editingProduct.images?.length || 0) >= 6
+                        ? 'Зургийн дээд хязгаар (6/6) дүүрсэн'
+                        : '+ Зураг оруулах (PNG/JPG/WEBP - Автомат WebP хөрвүүлэлт)'}
+                    </span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      disabled={uploadingProductImages || (editingProduct.images?.length || 0) >= 6}
+                      onChange={handleUploadProductImages}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {/* Progress bar when uploading */}
+                {uploadingProductImages && (
+                  <div className="p-2 bg-blue-100/70 border border-blue-200 rounded-lg text-[11px] text-blue-800 flex items-center gap-2 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    <span>{uploadProgressText}</span>
+                  </div>
+                )}
+
+                {/* Thumbnail Grid of Uploaded Images */}
+                {editingProduct.images && editingProduct.images.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                      {editingProduct.images.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          className={`relative group rounded-lg overflow-hidden border-2 bg-white flex flex-col justify-between ${
+                            idx === 0
+                              ? 'border-[#0088CC] ring-2 ring-[#0088CC]/20 shadow-xs'
+                              : 'border-zinc-200 hover:border-zinc-400'
+                          }`}
+                        >
+                          <div className="relative aspect-square w-full bg-zinc-100">
+                            <Image
+                              src={imgUrl}
+                              alt={`Зураг ${idx + 1}`}
+                              fill
+                              sizes="120px"
+                              className="object-cover"
+                            />
+                            {idx === 0 && (
+                              <div className="absolute top-1 left-1 bg-[#0088CC] text-white text-[8px] font-bold px-1.5 py-0.2 rounded shadow-xs flex items-center gap-0.5">
+                                <Star className="w-2.5 h-2.5 fill-current" />
+                                <span>ҮНДСЭН</span>
+                              </div>
+                            )}
+                            <div className="absolute top-1 right-1 bg-black/70 text-white text-[8px] font-mono px-1 py-0.2 rounded">
+                              #{idx + 1}
+                            </div>
+                          </div>
+
+                          {/* Quick Controls */}
+                          <div className="p-1 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between text-[10px]">
+                            {idx > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handleSetPrimaryImage(idx)}
+                                className="text-zinc-600 hover:text-[#0088CC] font-semibold text-[9px] hover:underline"
+                                title="Үндсэн нүүр зураг болгох"
+                              >
+                                Үндсэн
+                              </button>
+                            ) : (
+                              <span className="text-[9px] text-zinc-400 font-mono">Нүүр</span>
+                            )}
+
+                            <div className="flex items-center gap-0.5">
+                              {idx > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveProductImage(idx, 'left')}
+                                  className="p-1 text-zinc-400 hover:text-black rounded hover:bg-zinc-200"
+                                  title="Зүүн тийш зөөх"
+                                >
+                                  <ChevronLeftIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                              {idx < editingProduct.images!.length - 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveProductImage(idx, 'right')}
+                                  className="p-1 text-zinc-400 hover:text-black rounded hover:bg-zinc-200"
+                                  title="Баруун тийш зөөх"
+                                >
+                                  <ChevronRightIcon className="w-3 h-3" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveProductImage(idx)}
+                                className="p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-50 ml-0.5"
+                                title="Устгах"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Live Collage Preview */}
+                    <div className="mt-3 p-3 bg-white rounded-xl border border-zinc-200">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-bold text-zinc-700 uppercase flex items-center gap-1">
+                          <Layers className="w-3 h-3 text-[#0088CC]" />
+                          <span>Дэлгүүрт харагдах Collage загварын урьдчилсан харагдац</span>
+                        </span>
+                        <span className="text-[10px] text-emerald-600 font-semibold">
+                          {editingProduct.images.length === 1
+                            ? '1 зураг (Standard)'
+                            : `${editingProduct.images.length} зураг (Collage горим)`}
+                        </span>
+                      </div>
+
+                      <div className="max-w-md mx-auto aspect-[16/10] rounded-lg overflow-hidden border border-zinc-200">
+                        {renderCollageGrid(
+                          editingProduct.images,
+                          () => {},
+                          () => {}
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Manual URL Input Fallback */}
+                <div className="pt-2 border-t border-zinc-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-semibold text-zinc-600">
+                      Эсвэл үндсэн зургийн линк гараар оруулах (Сонголттой):
+                    </label>
+                  </div>
+                  <input
+                    type="text"
+                    value={editingProduct.image || ''}
+                    onChange={(e) => {
+                      const newUrl = e.target.value
+                      const cur = Array.isArray(editingProduct.images) ? [...editingProduct.images] : []
+                      if (cur.length === 0) cur.push(newUrl)
+                      else cur[0] = newUrl
+                      setEditingProduct({
+                        ...editingProduct,
+                        image: newUrl,
+                        images: cur,
+                      })
+                    }}
+                    placeholder="/images/product-morph-3d.png эсвэл https://..."
+                    className="w-full px-3 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                  />
+                </div>
               </div>
 
               <div>

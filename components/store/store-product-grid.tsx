@@ -10,6 +10,7 @@ import {
   ArrowRight,
   ExternalLink,
   Film,
+  Layers,
 } from 'lucide-react'
 import { STORE_PRODUCTS } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
@@ -148,6 +149,12 @@ export function StoreProductGrid() {
                         <div className="bg-red-600/90 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5" title="Sample видео үзэх">
                           <Film className="w-2.5 h-2.5" />
                           <span>Demo</span>
+                        </div>
+                      )}
+                      {product.images && product.images.length > 1 && (
+                        <div className="bg-black/85 backdrop-blur-xs text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5" title={`${product.images.length} зурагтай галерей`}>
+                          <Layers className="w-2.5 h-2.5 text-[#00B0FF]" />
+                          <span>{product.images.length}</span>
                         </div>
                       )}
                     </div>

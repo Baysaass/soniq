@@ -24,6 +24,7 @@ import { StoreFooter } from '@/components/store/store-footer'
 import { StoreCartDrawer } from '@/components/store/store-cart-drawer'
 import { StoreCheckoutModal } from '@/components/store/store-checkout-modal'
 import { StoreSampleVideo } from '@/components/store/store-sample-video'
+import { StoreProductCollage } from '@/components/store/store-product-collage'
 
 function ProductDetailContent({ slug }: { slug: string }) {
   const {
@@ -114,29 +115,13 @@ function ProductDetailContent({ slug }: { slug: string }) {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
             {/* Left: Product Artwork & Audio Preview */}
             <div className="md:col-span-5 flex flex-col items-center">
-              <div className="relative w-full aspect-[16/10] sm:aspect-[4/3] rounded-xl overflow-hidden border border-[#E6E6E3] bg-zinc-100 group shadow-xs">
-                <Image
-                  src={product.image}
-                  alt={product.title}
-                  fill
-                  priority
-                  className="object-cover"
-                />
-
-                <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
-                  {product.badge && (
-                    <div className="bg-[#141414] text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-xs">
-                      {product.badge}
-                    </div>
-                  )}
-                  {product.sampleVideoUrl && (
-                    <div className="bg-red-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
-                      <Film className="w-2.5 h-2.5" />
-                      <span>ВИДЕОТОЙ</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <StoreProductCollage
+                primaryImage={product.image}
+                images={product.images}
+                title={product.title}
+                badge={product.badge}
+                sampleVideoUrl={product.sampleVideoUrl}
+              />
 
               {/* Quick Specs Grid */}
               <div className="w-full grid grid-cols-2 gap-2 mt-3 text-xs">

@@ -31,6 +31,22 @@ export function getPostgresPool(): Pool | null {
 }
 
 function mapProductRow(row: any): StoreProduct {
+  let images: string[] = []
+  if (Array.isArray(row.images)) {
+    images = row.images.filter(Boolean)
+  } else if (typeof row.image === 'string' && row.image.includes('|||')) {
+    images = row.image.split('|||').map((s: string) => s.trim()).filter(Boolean)
+  } else if (typeof row.image === 'string' && row.image.startsWith('[') && row.image.endsWith(']')) {
+    try {
+      const parsed = JSON.parse(row.image)
+      if (Array.isArray(parsed)) images = parsed.filter(Boolean)
+    } catch {}
+  } else if (row.image) {
+    images = [row.image]
+  }
+
+  const primaryImage = images[0] || row.image || '/images/product-morph-3d.png'
+
   return {
     id: row.id,
     slug: row.slug,
@@ -44,7 +60,8 @@ function mapProductRow(row: any): StoreProduct {
     originalPriceMNT: Number(row.original_price_mnt) || 0,
     priceUSD: Number(row.price_usd) || 0,
     originalPriceUSD: Number(row.original_price_usd) || 0,
-    image: row.image || '/images/product-morph-3d.png',
+    image: primaryImage,
+    images: images.length > 0 ? images.slice(0, 6) : [primaryImage],
     features: Array.isArray(row.features) ? row.features : [],
     compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
     format: row.format || 'WAV Lossless',
@@ -140,6 +157,11 @@ export const postgresDB = {
           $23, $24, NOW(), NOW()
         ) RETURNING *
       `
+      const createImgs = Array.isArray(product.images) && product.images.length > 0
+        ? product.images.slice(0, 6)
+        : (product.image ? [product.image] : [])
+      const createSerializedImage = createImgs.length > 1 ? createImgs.join('|||') : (createImgs[0] || product.image || '/images/product-morph-3d.png')
+
       const values = [
         product.id || `prod_${Date.now()}`,
         product.slug || `pack-${Date.now()}`,
@@ -153,7 +175,7 @@ export const postgresDB = {
         product.originalPriceMNT || 89000,
         product.priceUSD || 9.99,
         product.originalPriceUSD || 29.0,
-        product.image || '/images/product-morph-3d.png',
+        createSerializedImage,
         JSON.stringify(product.features || []),
         JSON.stringify(product.compatibility || []),
         product.format || 'WAV Lossless',
@@ -182,6 +204,11 @@ export const postgresDB = {
       if (!current) return null
       const merged = { ...current, ...updates }
 
+      const updateImgs = Array.isArray(merged.images) && merged.images.length > 0
+        ? merged.images.slice(0, 6)
+        : (merged.image ? [merged.image] : [])
+      const updateSerializedImage = updateImgs.length > 1 ? updateImgs.join('|||') : (updateImgs[0] || merged.image || '/images/product-morph-3d.png')
+
       const query = `
         UPDATE products SET
           slug = $2, title = $3, subtitle = $4, category = $5, badge = $6,
@@ -203,7 +230,7 @@ export const postgresDB = {
         merged.originalPriceMNT,
         merged.priceUSD,
         merged.originalPriceUSD,
-        merged.image,
+        updateSerializedImage,
         JSON.stringify(merged.features || []),
         JSON.stringify(merged.compatibility || []),
         merged.format,
