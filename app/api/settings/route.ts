@@ -1,14 +1,36 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const settings = await db.getSettings()
-    // Do not leak adminPasscode in public GET, but return all bank info, social, announcement
-    const { adminPasscode, ...publicSettings } = settings
+    const { searchParams } = new URL(req.url)
+    const queryPasscode = searchParams.get('passcode')
+    const headerPasscode = req.headers.get('x-admin-passcode')
+    const isAuthorized = (queryPasscode || headerPasscode)
+      ? await db.verifyAdminPasscode(queryPasscode || headerPasscode || '')
+      : false
+
+    if (isAuthorized) {
+      const { adminPasscode, ...adminSettings } = settings
+      return NextResponse.json({
+        success: true,
+        settings: adminSettings,
+      })
+    }
+
+    // Public visitor view: strip secrets
+    const { adminPasscode, telegramBotToken, telegramChatId, ...publicSettings } = settings
+    const safeBankInfo = { ...(publicSettings.bankInfo || {}) }
+    delete (safeBankInfo as any).telegramBotToken
+    delete (safeBankInfo as any).telegramChatId
+
     return NextResponse.json({
       success: true,
-      settings: publicSettings,
+      settings: {
+        ...publicSettings,
+        bankInfo: safeBankInfo,
+      },
     })
   } catch (err: unknown) {
     const error = err as Error

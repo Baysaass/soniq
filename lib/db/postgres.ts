@@ -345,15 +345,18 @@ export const postgresDB = {
       const res = await pool.query("SELECT * FROM store_settings WHERE id = 'default' LIMIT 1")
       if (res.rows.length === 0) return null
       const data = res.rows[0]
+      const bankInfo = data.bank_info || {}
       return {
         storeName: data.store_name,
         subdomain: data.subdomain,
         currencyDefault: data.currency_default || 'MNT',
         adminPasscode: data.admin_passcode,
         announcementText: data.announcement_text,
-        bankInfo: data.bank_info || {},
+        bankInfo,
         defaultBundleWeTransfer: data.default_bundle_wetransfer || '',
         r2Config: data.r2_config || {},
+        telegramBotToken: bankInfo.telegramBotToken || '',
+        telegramChatId: bankInfo.telegramChatId || '',
       }
     } catch (err) {
       console.error('PostgreSQL getSettings error:', err)
@@ -365,6 +368,12 @@ export const postgresDB = {
     const pool = getPostgresPool()
     if (!pool) return false
     try {
+      const bankInfoMerged = {
+        ...(settings.bankInfo || {}),
+        ...(settings.telegramBotToken !== undefined ? { telegramBotToken: settings.telegramBotToken } : {}),
+        ...(settings.telegramChatId !== undefined ? { telegramChatId: settings.telegramChatId } : {}),
+      }
+
       const query = `
         INSERT INTO store_settings (
           id, store_name, subdomain, currency_default, admin_passcode,
@@ -387,7 +396,7 @@ export const postgresDB = {
         settings.currencyDefault,
         settings.adminPasscode,
         settings.announcementText,
-        settings.bankInfo ? JSON.stringify(settings.bankInfo) : null,
+        JSON.stringify(bankInfoMerged),
         settings.defaultBundleWeTransfer,
         settings.r2Config ? JSON.stringify(settings.r2Config) : null,
       ]

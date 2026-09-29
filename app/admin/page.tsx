@@ -66,6 +66,8 @@ interface StoreSettingsState {
     bucketName: string
     publicDomain: string
   }
+  telegramBotToken?: string
+  telegramChatId?: string
 }
 
 export default function AdminPage() {
@@ -120,12 +122,17 @@ export default function AdminPage() {
       bucketName: 'soniq-store',
       publicDomain: '',
     },
+    telegramBotToken: '',
+    telegramChatId: '',
   })
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [testingR2, setTestingR2] = useState(false)
   const [r2TestResult, setR2TestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [showR2Secret, setShowR2Secret] = useState(false)
+  const [testingTelegram, setTestingTelegram] = useState(false)
+  const [telegramTestResult, setTelegramTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null)
+  const [showTelegramGuide, setShowTelegramGuide] = useState(false)
 
   // Database status state
   const [dbStatus, setDbStatus] = useState<any>(null)
@@ -199,7 +206,7 @@ export default function AdminPage() {
             setIsAuthenticated(true)
             fetchProducts()
             fetchOrders(saved)
-            fetchSettings()
+            fetchSettings(saved)
             fetchDBStatus()
             fetchEmailStatus(saved)
           } else {
@@ -211,7 +218,7 @@ export default function AdminPage() {
           setIsAuthenticated(true)
           fetchProducts()
           fetchOrders(saved)
-          fetchSettings()
+          fetchSettings(saved)
           fetchDBStatus()
           fetchEmailStatus(saved)
         })
@@ -230,7 +237,7 @@ export default function AdminPage() {
         setAuthError('')
         fetchProducts()
         fetchOrders(passcode)
-        fetchSettings()
+        fetchSettings(passcode)
         fetchDBStatus()
         fetchEmailStatus(passcode)
       } else {
@@ -365,9 +372,11 @@ export default function AdminPage() {
   }
 
   // Fetch Settings
-  const fetchSettings = async () => {
+  const fetchSettings = async (codeToUse?: string) => {
     try {
-      const res = await fetch('/api/settings')
+      const activeCode = codeToUse || passcode || (typeof window !== 'undefined' ? sessionStorage.getItem('soniq_admin_passcode') : '') || ''
+      const url = activeCode ? `/api/settings?passcode=${encodeURIComponent(activeCode)}` : '/api/settings'
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         if (data.settings) {
@@ -385,11 +394,60 @@ export default function AdminPage() {
               bucketName: data.settings.r2Config?.bucketName || 'soniq-store',
               publicDomain: data.settings.r2Config?.publicDomain || '',
             },
+            telegramBotToken: data.settings.telegramBotToken || data.settings.bankInfo?.telegramBotToken || '',
+            telegramChatId: data.settings.telegramChatId || data.settings.bankInfo?.telegramChatId || '',
           }))
         }
       }
     } catch (err) {
       console.error('Failed to fetch settings:', err)
+    }
+  }
+
+  // Test Telegram Bot Connection
+  const handleTestTelegram = async () => {
+    const botToken = settings.telegramBotToken?.trim() || ''
+    const chatId = settings.telegramChatId?.trim() || ''
+
+    if (!botToken || !chatId) {
+      alert('Telegram Bot Token болон Chat ID хоёуланг нь оруулна уу.')
+      return
+    }
+
+    setTestingTelegram(true)
+    setTelegramTestResult(null)
+
+    try {
+      const activeCode = passcode || (typeof window !== 'undefined' ? sessionStorage.getItem('soniq_admin_passcode') : '') || ''
+      const res = await fetch('/api/admin/telegram-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          passcode: activeCode,
+          botToken,
+          chatId,
+        }),
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setTelegramTestResult({
+          success: true,
+          message: data.message || '✓ Амжилттай! Таны Telegram руу тест мессеж илгээгдлээ. Шаардлагатай бол "Тохиргоо хадгалах" товчийг дарна уу.',
+        })
+      } else {
+        setTelegramTestResult({
+          success: false,
+          error: data.error || 'Telegram мессеж илгээхэд алдаа гарлаа.',
+        })
+      }
+    } catch (err: any) {
+      setTelegramTestResult({
+        success: false,
+        error: err?.message || 'Сүлжээний холболтын алдаа гарлаа.',
+      })
+    } finally {
+      setTestingTelegram(false)
     }
   }
 
@@ -1513,6 +1571,135 @@ export default function AdminPage() {
                     className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                   />
                 </div>
+              </div>
+
+              {/* Telegram Order Notification Bot Card */}
+              <div className="p-4 bg-gradient-to-br from-blue-50/70 to-sky-50/40 rounded-xl border border-blue-200/90 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-[#0088CC] text-white flex items-center justify-center shadow-xs">
+                      <Send className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-zinc-900 text-xs flex items-center gap-2">
+                        <span>Telegram Захиалгын Мэдэгдэл Бот</span>
+                        {settings.telegramBotToken && settings.telegramChatId ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-300 px-2 py-0.5 rounded-full">
+                            ● Холбогдсон
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-medium text-amber-700 bg-amber-100/80 border border-amber-300 px-2 py-0.5 rounded-full">
+                            Тохируулаагүй
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                        Хэрэглэгч вэб дээр захиалга өгөх бүрд таны Telegram руу захиалагчийн нэр, утас, Gmail шуурхай мэдэгдэл болон очно.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowTelegramGuide(!showTelegramGuide)}
+                    className="text-[11px] text-[#0088CC] hover:text-[#006699] font-semibold underline underline-offset-2 cursor-pointer"
+                  >
+                    {showTelegramGuide ? 'Заавар нуух' : 'Хэрхэн авах вэ?'}
+                  </button>
+                </div>
+
+                {showTelegramGuide && (
+                  <div className="p-3 bg-white rounded-lg border border-blue-200 text-[11px] text-zinc-600 space-y-2">
+                    <div className="font-bold text-blue-900">💡 2 минутад Telegram Bot холбох заавар:</div>
+                    <ol className="list-decimal pl-4 space-y-1">
+                      <li>
+                        Telegram дээр <b><a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer" className="text-[#0088CC] hover:underline">@BotFather</a></b> руу ороод <code>/newbot</code> гэж бичин ботоо үүсгэж <b>HTTP API Token</b>-оо хуулж авна.
+                      </li>
+                      <li>
+                        Үүсгэсэн шинэ бот руугаа орж <b>Start</b> дарна.
+                      </li>
+                      <li>
+                        Telegram дээр <b><a href="https://t.me/userinfobot" target="_blank" rel="noopener noreferrer" className="text-[#0088CC] hover:underline">@userinfobot</a></b> эсвэл <b><a href="https://t.me/raw_data_bot" target="_blank" rel="noopener noreferrer" className="text-[#0088CC] hover:underline">@raw_data_bot</a></b> руу <code>/start</code> гэж бичээд өөрийн <b>Id (Chat ID)</b>-гаа хуулж авна.
+                      </li>
+                      <li>
+                        Доорх талбарт оруулаад <b>"Тест мессеж илгээх"</b> дарж шалгаад, хуудасны доод талын <b>"Тохиргоо хадгалах"</b> дарна.
+                      </li>
+                    </ol>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                      Telegram Bot Token
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Жишээ: 7123456789:AAHqxxxxxxxxxx"
+                      value={settings.telegramBotToken || ''}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          telegramBotToken: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                      Telegram Chat ID (Хувийн эсвэл Группийн ID)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Жишээ: 123456789 эсвэл -100xxxxxxxx"
+                      value={settings.telegramChatId || ''}
+                      onChange={(e) =>
+                        setSettings({
+                          ...settings,
+                          telegramChatId: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                  <span className="text-[10px] text-zinc-400">
+                    Мөн Vercel дээр <code>TELEGRAM_BOT_TOKEN</code> ба <code>TELEGRAM_CHAT_ID</code> гэж тохируулах боломжтой.
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={handleTestTelegram}
+                    disabled={testingTelegram || !settings.telegramBotToken?.trim() || !settings.telegramChatId?.trim()}
+                    className="py-1.5 px-3.5 rounded-lg bg-[#0088CC] hover:bg-[#0077b3] disabled:opacity-50 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors flex items-center gap-1.5"
+                  >
+                    <Send className={`w-3.5 h-3.5 ${testingTelegram ? 'animate-pulse' : ''}`} />
+                    <span>{testingTelegram ? 'Илгээж байна...' : 'Тест мессеж илгээх'}</span>
+                  </button>
+                </div>
+
+                {telegramTestResult && (
+                  <div
+                    className={`p-2.5 rounded-lg text-xs flex items-start gap-2 ${
+                      telegramTestResult.success
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                        : 'bg-red-50 text-red-800 border border-red-200'
+                    }`}
+                  >
+                    {telegramTestResult.success ? (
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    )}
+                    <span className="leading-relaxed">
+                      {telegramTestResult.message || telegramTestResult.error}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Default WeTransfer link */}

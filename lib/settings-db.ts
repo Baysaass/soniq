@@ -23,9 +23,13 @@ export interface StoreSettingsType {
     qpayShortcode: string
     supportInstagram: string
     supportTelegram: string
+    telegramBotToken?: string
+    telegramChatId?: string
   }
   defaultBundleWeTransfer: string
   r2Config?: R2Config
+  telegramBotToken?: string
+  telegramChatId?: string
 }
 
 export async function getStoreSettingsAsync(): Promise<StoreSettingsType> {

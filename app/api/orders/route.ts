@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { sendTelegramOrderNotification } from '@/lib/telegram'
 
 export async function POST(request: Request) {
   try {
@@ -71,6 +72,11 @@ export async function POST(request: Request) {
       paymentMethod: paymentMethod || 'KHAN_BANK',
       weTransferLink: orderWeTransferLink,
       r2Key: orderR2Key,
+    })
+
+    // Dispatch Telegram notification (non-blocking)
+    sendTelegramOrderNotification(order).catch((err) => {
+      console.warn('Telegram notification background warning:', err)
     })
 
     return NextResponse.json({

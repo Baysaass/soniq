@@ -320,15 +320,18 @@ export const supabaseDB = {
     if (!supabase) return null
     const { data, error } = await supabase.from('store_settings').select('*').eq('id', 'default').maybeSingle()
     if (error || !data) return null
+    const bankInfo = data.bank_info || {}
     return {
       storeName: data.store_name,
       subdomain: data.subdomain,
       currencyDefault: data.currency_default || 'MNT',
       adminPasscode: data.admin_passcode,
       announcementText: data.announcement_text,
-      bankInfo: data.bank_info || {},
+      bankInfo,
       defaultBundleWeTransfer: data.default_bundle_wetransfer || '',
       r2Config: data.r2_config || {},
+      telegramBotToken: bankInfo.telegramBotToken || '',
+      telegramChatId: bankInfo.telegramChatId || '',
     }
   },
 
@@ -341,7 +344,13 @@ export const supabaseDB = {
     if (settings.currencyDefault !== undefined) row.currency_default = settings.currencyDefault
     if (settings.adminPasscode !== undefined) row.admin_passcode = settings.adminPasscode
     if (settings.announcementText !== undefined) row.announcement_text = settings.announcementText
-    if (settings.bankInfo !== undefined) row.bank_info = settings.bankInfo
+    if (settings.bankInfo !== undefined || settings.telegramBotToken !== undefined || settings.telegramChatId !== undefined) {
+      row.bank_info = {
+        ...(settings.bankInfo || {}),
+        ...(settings.telegramBotToken !== undefined ? { telegramBotToken: settings.telegramBotToken } : {}),
+        ...(settings.telegramChatId !== undefined ? { telegramChatId: settings.telegramChatId } : {}),
+      }
+    }
     if (settings.defaultBundleWeTransfer !== undefined) row.default_bundle_wetransfer = settings.defaultBundleWeTransfer
     if (settings.r2Config !== undefined) row.r2_config = settings.r2Config
 
