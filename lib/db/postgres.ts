@@ -227,7 +227,12 @@ export const postgresDB = {
     const pool = getPostgresPool()
     if (!pool) return false
     try {
-      await pool.query('DELETE FROM products WHERE id = $1', [id])
+      const target = (id || '').trim()
+      if (!target || target === 'undefined' || target === 'null') {
+        await pool.query("DELETE FROM products WHERE id = '' OR id IS NULL")
+        return true
+      }
+      await pool.query('DELETE FROM products WHERE id = $1 OR slug = $1', [target])
       return true
     } catch (err) {
       console.error('PostgreSQL deleteProduct error:', err)

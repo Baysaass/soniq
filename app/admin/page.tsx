@@ -417,8 +417,9 @@ export default function AdminPage() {
 
   // Open Product Modal (New or Edit)
   const openNewProductModal = () => {
+    const tempId = `prod_${Date.now()}`
     setEditingProduct({
-      id: '',
+      id: tempId,
       title: '',
       slug: '',
       subtitle: '',
@@ -493,24 +494,48 @@ export default function AdminPage() {
   }
 
   // Delete Product
-  const handleDeleteProduct = async (id: string, title: string) => {
+  const handleDeleteProduct = async (id: string, title: string, slug?: string) => {
     if (!confirm(`"${title}" бүтээгдэхүүнийг дэлгүүрээс устгахдаа итгэлтэй байна уу?`)) {
       return
     }
 
+    const activePasscode = passcode || (typeof window !== 'undefined' ? sessionStorage.getItem('soniq_admin_passcode') : '') || ''
+    const targetIdentifier = (id && id.trim()) ? id.trim() : (slug && slug.trim()) ? slug.trim() : ''
+
     try {
-      const res = await fetch(`/api/products/${id}?passcode=${encodeURIComponent(passcode)}`, {
+      const url = targetIdentifier
+        ? `/api/products/${encodeURIComponent(targetIdentifier)}?passcode=${encodeURIComponent(activePasscode)}`
+        : `/api/products?id=${encodeURIComponent(targetIdentifier)}&slug=${encodeURIComponent(slug || '')}&passcode=${encodeURIComponent(activePasscode)}`
+
+      const res = await fetch(url, {
         method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': activePasscode,
+        },
+        body: JSON.stringify({
+          id: targetIdentifier,
+          slug: slug || '',
+          passcode: activePasscode,
+        }),
       })
-      const data = await res.json()
-      if (data.success) {
+
+      let data: any = null
+      try {
+        data = await res.json()
+      } catch {
+        const text = await res.text().catch(() => '')
+        data = { error: text || `Серверийн хариу: HTTP ${res.status}` }
+      }
+
+      if (res.ok && data?.success) {
         fetchProducts()
       } else {
-        alert(data.error || 'Устгахад алдаа гарлаа.')
+        alert(data?.error || 'Бүтээгдэхүүн устгахад алдаа гарлаа.')
       }
-    } catch (err) {
-      console.error(err)
-      alert('Сүлжээний алдаа гарлаа.')
+    } catch (err: any) {
+      console.error('Delete product error:', err)
+      alert(`Устгахад алдаа гарлаа: ${err?.message || 'Сүлжээний холболтоо шалгана уу'}`)
     }
   }
 
@@ -1064,7 +1089,7 @@ export default function AdminPage() {
                               </button>
 
                               <button
-                                onClick={() => handleDeleteProduct(p.id, p.title)}
+                                onClick={() => handleDeleteProduct(p.id, p.title, p.slug)}
                                 className="p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-50 cursor-pointer"
                                 title="Устгах"
                               >

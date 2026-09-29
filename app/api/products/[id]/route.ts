@@ -51,19 +51,31 @@ export async function DELETE(
   try {
     const { id } = await params
     const { searchParams } = new URL(req.url)
-    const passcode = searchParams.get('passcode')
+    const queryPasscode = searchParams.get('passcode')
+    const headerPasscode = req.headers.get('x-admin-passcode')
 
-    const isAuthorized = await db.verifyAdminPasscode(passcode || '')
+    let bodyPasscode = ''
+    try {
+      const body = await req.json()
+      if (body?.passcode) bodyPasscode = body.passcode
+    } catch {
+      // Body may be empty in DELETE
+    }
+
+    const passcode = queryPasscode || headerPasscode || bodyPasscode || ''
+
+    const isAuthorized = await db.verifyAdminPasscode(passcode)
     if (!isAuthorized) {
       return NextResponse.json({ success: false, error: 'Нууц код буруу байна.' }, { status: 401 })
     }
 
-    const success = await db.deleteProduct(id)
+    const targetId = decodeURIComponent(id || '').trim()
+    const success = await db.deleteProduct(targetId)
     if (!success) {
-      return NextResponse.json({ success: false, error: 'Бүтээгдэхүүн устгахад алдаа гарлаа.' }, { status: 404 })
+      return NextResponse.json({ success: false, error: 'Бүтээгдэхүүн олдсонгүй эсвэл устгахад алдаа гарлаа.' }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: 'Бүтээгдэхүүн амжилттай устгагдлаа.' })
   } catch (err: unknown) {
     const error = err as Error
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })

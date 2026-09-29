@@ -137,7 +137,13 @@ export const localDB = {
 
   deleteProduct(id: string): boolean {
     const products = this.getProducts()
-    const filtered = products.filter((p) => p.id !== id)
+    const target = (id || '').trim()
+    const filtered = products.filter((p) => {
+      if (!target || target === 'undefined' || target === 'null') {
+        return Boolean(p.id && p.id.trim())
+      }
+      return p.id !== target && p.slug !== target
+    })
     if (filtered.length === products.length) return false
     return this.saveProducts(filtered)
   },

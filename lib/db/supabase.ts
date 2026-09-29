@@ -204,7 +204,15 @@ export const supabaseDB = {
   async createProduct(product: Partial<StoreProduct>): Promise<StoreProduct | null> {
     const supabase = getSupabaseClient()
     if (!supabase) return null
-    const row = mapProductToRow(product)
+    const cleanId = (product.id && product.id.trim()) ? product.id.trim() : `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    const cleanSlug = (product.slug && product.slug.trim())
+      ? product.slug.trim()
+      : ((product.title || 'pack').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `pack-${Date.now()}`)
+    const row = mapProductToRow({
+      ...product,
+      id: cleanId,
+      slug: cleanSlug,
+    })
     const { data, error } = await supabase.from('products').insert([row]).select('*').single()
     if (error) {
       console.error('Supabase createProduct error:', error)
@@ -228,10 +236,31 @@ export const supabaseDB = {
   async deleteProduct(id: string): Promise<boolean> {
     const supabase = getSupabaseClient()
     if (!supabase) return false
-    const { error } = await supabase.from('products').delete().eq('id', id)
+    const target = (id || '').trim()
+
+    // If target is empty or 'undefined', delete rows with empty/null id or matching test
+    if (!target || target === 'undefined' || target === 'null') {
+      const { error } = await supabase.from('products').delete().or("id.eq.'',id.is.null")
+      return !error
+    }
+
+    // Try deleting by id OR slug
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .or(`id.eq.${target},slug.eq.${target}`)
+
     if (error) {
-      console.error('Supabase deleteProduct error:', error)
-      return false
+      console.warn('Supabase deleteProduct .or failed, trying .eq id:', error.message)
+      const { error: errId } = await supabase.from('products').delete().eq('id', target)
+      if (errId) {
+        console.warn('Supabase deleteProduct .eq id failed, trying slug:', errId.message)
+        const { error: errSlug } = await supabase.from('products').delete().eq('slug', target)
+        if (errSlug) {
+          console.error('Supabase deleteProduct error:', errSlug)
+          return false
+        }
+      }
     }
     return true
   },
