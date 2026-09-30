@@ -103,18 +103,23 @@ export const localDB = {
       originalPriceUSD: Number(data.originalPriceUSD) || 29.0,
       image: data.image || (Array.isArray(data.images) && data.images[0]) || '/images/product-morph-3d.png',
       images: Array.isArray(data.images) && data.images.length > 0 ? data.images.slice(0, 6) : (data.image ? [data.image] : []),
-      features: Array.isArray(data.features) ? data.features : ['Өндөр чанарын аудио сан', '100% Royalty Free'],
+      features: Array.isArray(data.features) ? data.features : ['Өндөр чанарын дижитал бүтээгдэхүүн', '100% Royalty Free'],
       compatibility:
         Array.isArray(data.compatibility) && data.compatibility.length > 0
           ? data.compatibility
-          : ['Premiere Pro', 'DaVinci Resolve', 'CapCut'],
-      format: data.format || 'WAV 24-bit / 96kHz Lossless',
-      fileSize: data.fileSize || '1.2 GB',
+          : ['Бүх төхөөрөмж дээр ажиллана'],
+      format: (Array.isArray(data.fileFormats) && data.fileFormats.length > 0)
+        ? data.fileFormats.join(', ')
+        : (data.format || ''),
+      fileFormats: Array.isArray(data.fileFormats)
+        ? data.fileFormats
+        : (data.format ? data.format.split(',').map((s) => s.trim()).filter(Boolean) : []),
+      fileSize: data.fileSize || '',
       downloadCount: data.downloadCount || '0+ таталт',
       defaultWeTransferLink: data.defaultWeTransferLink || '',
       sampleVideoUrl: data.sampleVideoUrl || '',
       r2Key: data.r2Key || '',
-      previewSoundType: data.previewSoundType || 'whoosh',
+      previewSoundType: data.previewSoundType || 'none',
       isBundle: Boolean(data.isBundle),
       description: data.description || '',
     }
@@ -133,19 +138,30 @@ export const localDB = {
     if (index === -1) {
       index = products.findIndex((p) => p.slug === id)
     }
+
     if (index === -1) {
-      return this.createProduct({
-        ...updates,
-        id: id || `prod_${Date.now()}`,
-        slug: updates.slug || id || `pack-${Date.now()}`,
-      })
+      return this.createProduct({ ...updates, id: id || updates.id })
     }
 
-    const updatedProduct = {
-      ...products[index],
+    const current = products[index]
+    const mergedImages = Array.isArray(updates.images) && updates.images.length > 0
+      ? updates.images.slice(0, 6)
+      : (updates.image ? [updates.image] : (current.images || [current.image]))
+
+    const mergedFormats = Array.isArray(updates.fileFormats)
+      ? updates.fileFormats
+      : (updates.format ? updates.format.split(',').map(s => s.trim()).filter(Boolean) : current.fileFormats)
+
+    const updatedProduct: StoreProduct = {
+      ...current,
       ...updates,
-      id,
+      images: mergedImages,
+      image: mergedImages[0] || current.image,
+      fileFormats: mergedFormats,
+      format: (Array.isArray(mergedFormats) && mergedFormats.length > 0) ? mergedFormats.join(', ') : (updates.format ?? current.format),
+      previewSoundType: updates.previewSoundType !== undefined ? updates.previewSoundType : (current.previewSoundType || 'none'),
     }
+
     products[index] = updatedProduct
     this.saveProducts(products)
     return updatedProduct

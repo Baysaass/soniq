@@ -25,6 +25,7 @@ import { StoreCartDrawer } from '@/components/store/store-cart-drawer'
 import { StoreCheckoutModal } from '@/components/store/store-checkout-modal'
 import { StoreSampleVideo } from '@/components/store/store-sample-video'
 import { StoreProductCollage } from '@/components/store/store-product-collage'
+import { FileFormatBadgeList } from '@/components/store/file-format-badge'
 
 function ProductDetailContent({ slug }: { slug: string }) {
   const {
@@ -153,21 +154,40 @@ function ProductDetailContent({ slug }: { slug: string }) {
 
               {/* Quick Specs Grid */}
               <div className="w-full grid grid-cols-2 gap-2 mt-3 text-xs">
-                <div className="p-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3]">
-                  <span className="text-[10px] text-zinc-400 block font-mono">ХЭМЖЭЭ</span>
-                  <span className="font-bold text-[#141414] text-xs">{product.fileSize}</span>
+                <div className="col-span-2 p-2.5 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3]">
+                  <span className="text-[10px] text-zinc-400 block font-mono mb-1.5 font-bold uppercase tracking-wider">
+                    ДАГАЛДАХ ФАЙЛЫН ТӨРЛҮҮД
+                  </span>
+                  {(() => {
+                    const fmts = Array.isArray(product.fileFormats) && product.fileFormats.length > 0
+                      ? product.fileFormats
+                      : (product.format ? product.format.split(',').map((s) => s.trim()).filter(Boolean) : [])
+                    if (fmts.length > 0) {
+                      return <FileFormatBadgeList formats={fmts} size="sm" />
+                    }
+                    return (
+                      <span className="font-bold text-[#141414] text-xs">
+                        {product.format || 'Дижитал сан'}
+                      </span>
+                    )
+                  })()}
                 </div>
-                <div className="p-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3]">
-                  <span className="text-[10px] text-zinc-400 block font-mono">ФОРМАТ</span>
-                  <span className="font-bold text-[#141414] text-xs">WAV Lossless 24-bit</span>
-                </div>
+
+                {product.fileSize ? (
+                  <div className="p-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3]">
+                    <span className="text-[10px] text-zinc-400 block font-mono">ХЭМЖЭЭ</span>
+                    <span className="font-bold text-[#141414] text-xs">{product.fileSize}</span>
+                  </div>
+                ) : (
+                  <div className="p-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3]">
+                    <span className="text-[10px] text-zinc-400 block font-mono">ХАНДАЛТ</span>
+                    <span className="font-bold text-[#141414] text-xs">Google Drive</span>
+                  </div>
+                )}
+
                 <div className="p-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3]">
                   <span className="text-[10px] text-zinc-400 block font-mono">ЛИЦЕНЗ</span>
                   <span className="font-bold text-emerald-600 text-xs">100% Commercial</span>
-                </div>
-                <div className="p-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3]">
-                  <span className="text-[10px] text-zinc-400 block font-mono">ТАТАЛТ</span>
-                  <span className="font-bold text-[#141414] text-xs">WeTransfer Pro</span>
                 </div>
               </div>
 

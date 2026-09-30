@@ -238,7 +238,10 @@ class SoundSynthesizer {
     } catch {}
   }
 
-  playByType(type: 'whoosh' | 'impact' | 'braam' | 'ui' | 'glitch' | 'anime' | 'riser') {
+  playByType(type?: string) {
+    if (!type || type === 'none') {
+      return
+    }
     switch (type) {
       case 'whoosh':
         return this.playWhoosh()
@@ -255,7 +258,7 @@ class SoundSynthesizer {
       case 'riser':
         return this.playRiser()
       default:
-        return this.playWhoosh()
+        return
     }
   }
 }

@@ -51,6 +51,11 @@ import { SoniqMark, SoniqWordmark } from '@/components/logo'
 import { R2FileUploader } from '@/components/admin/r2-file-uploader'
 import { convertImageFileToWebP } from '@/lib/image-utils'
 import { renderCollageGrid } from '@/components/store/store-product-collage'
+import {
+  FileFormatSelector,
+  FileFormatBadgeList,
+  FileFormatBadge,
+} from '@/components/store/file-format-badge'
 import type { Order } from '@/lib/orders-db'
 
 interface StoreSettingsState {
@@ -517,12 +522,13 @@ export default function AdminPage() {
       originalPriceUSD: 29.0,
       image: '/images/product-morph-3d.png',
       images: ['/images/product-morph-3d.png'],
-      fileSize: '1.2 GB',
-      format: 'WAV 24-bit / 96kHz Lossless',
-      features: ['Өндөр чанарын аудио сан', '100% Royalty Free арилжааны лиценз', 'Timeline руу шууд чирч тавих'],
-      compatibility: ['Premiere Pro', 'DaVinci Resolve', 'CapCut', 'After Effects'],
+      fileSize: '',
+      format: '',
+      fileFormats: [],
+      features: ['Өндөр чанарын бүтээгдэхүүн', '100% Royalty Free арилжааны лиценз'],
+      compatibility: ['Бүх төхөөрөмж дээр ажиллана'],
       defaultWeTransferLink: '',
-      previewSoundType: 'whoosh',
+      previewSoundType: 'none',
       isBundle: false,
       sampleVideoUrl: '',
       r2Key: '',
@@ -536,10 +542,18 @@ export default function AdminPage() {
     const currentImgs = Array.isArray(prod.images) && prod.images.length > 0
       ? prod.images.filter(Boolean)
       : (prod.image ? [prod.image] : ['/images/product-morph-3d.png'])
+
+    const parsedFormats = Array.isArray(prod.fileFormats) && prod.fileFormats.length > 0
+      ? prod.fileFormats
+      : (prod.format ? prod.format.split(',').map((s) => s.trim()).filter(Boolean) : [])
+
     setEditingProduct({
       ...prod,
       image: currentImgs[0] || '/images/product-morph-3d.png',
       images: currentImgs,
+      fileFormats: parsedFormats,
+      features: Array.isArray(prod.features) && prod.features.length > 0 ? prod.features : [''],
+      previewSoundType: prod.previewSoundType || 'none',
     })
     setProductModalError('')
     setIsProductModalOpen(true)
@@ -686,15 +700,29 @@ export default function AdminPage() {
         ? editingProduct.images.slice(0, 6)
         : (editingProduct.image ? [editingProduct.image] : ['/images/product-morph-3d.png'])
 
+      const cleanFeatures = (Array.isArray(editingProduct.features) ? editingProduct.features : [])
+        .map((f) => (typeof f === 'string' ? f.trim() : ''))
+        .filter((f) => f.length > 0)
+
+      const cleanFormats = (Array.isArray(editingProduct.fileFormats) ? editingProduct.fileFormats : [])
+        .map((f) => (typeof f === 'string' ? f.trim() : ''))
+        .filter((f) => f.length > 0)
+
+      const payload = {
+        ...editingProduct,
+        image: currentImgs[0] || '/images/product-morph-3d.png',
+        images: currentImgs,
+        features: cleanFeatures.length > 0 ? cleanFeatures : ['Өндөр чанарын бүтээгдэхүүн', '100% Royalty Free лиценз'],
+        fileFormats: cleanFormats,
+        format: cleanFormats.length > 0 ? cleanFormats.join(', ') : (editingProduct.format || ''),
+        previewSoundType: editingProduct.previewSoundType || 'none',
+        passcode,
+      }
+
       let res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...editingProduct,
-          image: currentImgs[0] || '/images/product-morph-3d.png',
-          images: currentImgs,
-          passcode,
-        }),
+        body: JSON.stringify(payload),
       })
 
       // If PUT returns 404 (product not found in DB), fallback to POST to create/save it cleanly
@@ -702,12 +730,7 @@ export default function AdminPage() {
         res = await fetch('/api/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ...editingProduct,
-            image: currentImgs[0] || '/images/product-morph-3d.png',
-            images: currentImgs,
-            passcode,
-          }),
+          body: JSON.stringify(payload),
         })
       }
 
@@ -1247,8 +1270,33 @@ export default function AdminPage() {
                           </td>
 
                           <td className="py-3 px-3 text-[11px] text-zinc-600">
-                            <div>{p.fileSize}</div>
-                            <div className="text-[10px] text-zinc-400">{p.format}</div>
+                            {(() => {
+                              const fmts = Array.isArray(p.fileFormats) && p.fileFormats.length > 0
+                                ? p.fileFormats
+                                : (p.format ? p.format.split(',').map((s) => s.trim()).filter(Boolean) : [])
+                              return (
+                                <div className="space-y-1">
+                                  {fmts.length > 0 ? (
+                                    <FileFormatBadgeList formats={fmts} size="xs" max={3} />
+                                  ) : p.format ? (
+                                    <div className="text-[10px] text-zinc-500 font-mono">{p.format}</div>
+                                  ) : (
+                                    <div className="text-[10px] text-zinc-400 font-mono italic">Тохируулаагүй</div>
+                                  )}
+                                  {p.fileSize && (
+                                    <div className="text-[10px] text-zinc-400 font-mono">{p.fileSize}</div>
+                                  )}
+                                  {p.previewSoundType && p.previewSoundType !== 'none' ? (
+                                    <div className="text-[9px] text-emerald-600 font-mono flex items-center gap-0.5">
+                                      <Volume2 className="w-2.5 h-2.5" />
+                                      <span>{p.previewSoundType}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="text-[9px] text-zinc-400 font-mono">Дуугүй</div>
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </td>
 
                           <td className="py-3 px-3">
@@ -2463,7 +2511,10 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Файлын хэмжээ</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700">Файлын хэмжээ</label>
+                    <span className="text-[9px] text-zinc-400">Сонголттой</span>
+                  </div>
                   <input
                     type="text"
                     value={editingProduct.fileSize || ''}
@@ -2474,12 +2525,16 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Сонсох төрөл</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700">Сонсох төрөл</label>
+                    <span className="text-[9px] text-zinc-400">Сонголттой</span>
+                  </div>
                   <select
-                    value={editingProduct.previewSoundType || 'whoosh'}
+                    value={editingProduct.previewSoundType || 'none'}
                     onChange={(e) => setEditingProduct({ ...editingProduct, previewSoundType: e.target.value as any })}
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                   >
+                    <option value="none">🔇 Сонсох дуугүй (None / Дуугүй)</option>
                     <option value="whoosh">Whoosh (Шилжилт)</option>
                     <option value="braam">Braam (Гүн басс)</option>
                     <option value="impact">Impact (Цохилт)</option>
@@ -2490,6 +2545,22 @@ export default function AdminPage() {
                   </select>
                 </div>
               </div>
+
+              {/* Product File Formats & Extensions Selector */}
+              <FileFormatSelector
+                selectedFormats={
+                  Array.isArray(editingProduct.fileFormats)
+                    ? editingProduct.fileFormats
+                    : (editingProduct.format ? editingProduct.format.split(',').map((s) => s.trim()).filter(Boolean) : [])
+                }
+                onChange={(newFormats) =>
+                  setEditingProduct({
+                    ...editingProduct,
+                    fileFormats: newFormats,
+                    format: newFormats.join(', '),
+                  })
+                }
+              />
 
               {/* Google Drive / Download Link - PRIMARY & DEFAULT */}
               <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200/90 space-y-2">
@@ -2834,22 +2905,100 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Онцлогууд (Features - Мөр тус бүрт 1 онцлог бичнэ үү)
-                </label>
-                <textarea
-                  rows={3}
-                  value={Array.isArray(editingProduct.features) ? editingProduct.features.join('\n') : ''}
-                  onChange={(e) =>
-                    setEditingProduct({
-                      ...editingProduct,
-                      features: e.target.value.split('\n').filter((l) => l.trim().length > 0),
-                    })
-                  }
-                  placeholder="500+ Lossless WAV дуунууд&#10;100% Royalty Free лиценз&#10;Premiere Pro нийцтэй"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
-                />
+              {/* Features Line-by-Line Section */}
+              <div className="p-3.5 bg-[#FAFAFA] rounded-xl border border-[#E6E6E3] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Онцлогууд (Features - Мөр тус бүрт 1 онцлог бичнэ үү)</span>
+                    </label>
+                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                      Бүтээгдэхүүний гол давуу талууд ба онцлогуудыг мөр бүрээр тус тусад нь оруулна уу.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cur = Array.isArray(editingProduct.features) ? [...editingProduct.features] : []
+                      setEditingProduct({
+                        ...editingProduct,
+                        features: [...cur, ''],
+                      })
+                    }}
+                    className="px-2.5 py-1 bg-white hover:bg-zinc-100 text-[#0088CC] border border-blue-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Мөр нэмэх</span>
+                  </button>
+                </div>
+
+                {/* Line by line inputs */}
+                <div className="space-y-1.5">
+                  {(Array.isArray(editingProduct.features) && editingProduct.features.length > 0
+                    ? editingProduct.features
+                    : ['']
+                  ).map((feature, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-zinc-200 text-zinc-700 text-[10px] font-mono font-bold flex items-center justify-center shrink-0">
+                        #{idx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={feature}
+                        onChange={(e) => {
+                          const updated = Array.isArray(editingProduct.features)
+                            ? [...editingProduct.features]
+                            : ['']
+                          updated[idx] = e.target.value
+                          setEditingProduct({
+                            ...editingProduct,
+                            features: updated,
+                          })
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            const cur = Array.isArray(editingProduct.features)
+                              ? [...editingProduct.features]
+                              : []
+                            cur.splice(idx + 1, 0, '')
+                            setEditingProduct({
+                              ...editingProduct,
+                              features: cur,
+                            })
+                          }
+                        }}
+                        placeholder={`Онцлог #${idx + 1} (Жишээ: 100% арилжааны лицензтэй, Figma & Word дээр бүрэн засах боломжтой)`}
+                        className="w-full px-3 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const cur = Array.isArray(editingProduct.features)
+                            ? editingProduct.features
+                            : ['']
+                          const updated = cur.filter((_, i) => i !== idx)
+                          setEditingProduct({
+                            ...editingProduct,
+                            features: updated.length > 0 ? updated : [''],
+                          })
+                        }}
+                        className="p-1.5 text-zinc-400 hover:text-red-600 rounded-lg hover:bg-red-50 cursor-pointer transition-colors shrink-0"
+                        title="Энэ мөрийг хасах"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-0.5">
+                  <span>💡 Enter дарж шинэ мөр үүсгэж болно. Хоосон мөр автоматаар хасагдана.</span>
+                  <span>
+                    {(editingProduct.features || []).filter((f) => f && f.trim().length > 0).length} онцлог бичигдсэн
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-lg">

@@ -182,6 +182,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }
 
   const playSoundPreview = (product: StoreProduct) => {
+    if (!product.previewSoundType || product.previewSoundType === 'none') {
+      return
+    }
     if (playingSoundId === product.id) {
       setPlayingSoundId(null)
       return

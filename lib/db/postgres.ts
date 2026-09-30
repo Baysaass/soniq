@@ -64,13 +64,16 @@ function mapProductRow(row: any): StoreProduct {
     images: images.length > 0 ? images.slice(0, 6) : [primaryImage],
     features: Array.isArray(row.features) ? row.features : [],
     compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
-    format: row.format || 'WAV Lossless',
+    format: row.format || '',
+    fileFormats: row.format
+      ? row.format.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [],
     fileSize: row.file_size || '',
     downloadCount: row.download_count || '',
     defaultWeTransferLink: row.default_wetransfer_link || '',
     sampleVideoUrl: row.sample_video_url || '',
     r2Key: row.r2_key || '',
-    previewSoundType: row.preview_sound_type || 'whoosh',
+    previewSoundType: row.preview_sound_type || 'none',
     isBundle: Boolean(row.is_bundle),
     description: row.description || '',
   }
@@ -178,13 +181,13 @@ export const postgresDB = {
         createSerializedImage,
         JSON.stringify(product.features || []),
         JSON.stringify(product.compatibility || []),
-        product.format || 'WAV Lossless',
+        product.format || (Array.isArray(product.fileFormats) ? product.fileFormats.join(', ') : ''),
         product.fileSize || '',
         product.downloadCount || '0+ таталт',
         product.defaultWeTransferLink || '',
         product.sampleVideoUrl || '',
         product.r2Key || '',
-        product.previewSoundType || 'whoosh',
+        product.previewSoundType || 'none',
         Boolean(product.isBundle),
         product.description || '',
       ]
@@ -215,6 +218,9 @@ export const postgresDB = {
         })
       }
       const merged = { ...current, ...updates }
+      if (Array.isArray(updates.fileFormats)) {
+        merged.format = updates.fileFormats.join(', ')
+      }
 
       const updateImgs = Array.isArray(merged.images) && merged.images.length > 0
         ? merged.images.slice(0, 6)

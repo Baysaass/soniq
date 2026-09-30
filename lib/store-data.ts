@@ -19,7 +19,8 @@ export interface StoreProduct {
   fileSize: string
   downloadCount: string
   defaultWeTransferLink: string
-  previewSoundType: 'whoosh' | 'impact' | 'braam' | 'ui' | 'glitch' | 'anime' | 'riser'
+  previewSoundType?: 'whoosh' | 'impact' | 'braam' | 'ui' | 'glitch' | 'anime' | 'riser' | 'none' | ''
+  fileFormats?: string[]
   isBundle?: boolean
   description: string
   sampleVideoUrl?: string

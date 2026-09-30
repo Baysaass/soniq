@@ -69,13 +69,16 @@ function mapProductRow(row: any): StoreProduct {
     images: images.length > 0 ? images.slice(0, 6) : [primaryImage],
     features: Array.isArray(row.features) ? row.features : [],
     compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
-    format: row.format || 'WAV Lossless',
+    format: row.format || '',
+    fileFormats: row.format
+      ? row.format.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : [],
     fileSize: row.file_size || '',
     downloadCount: row.download_count || '',
     defaultWeTransferLink: row.default_wetransfer_link || '',
     sampleVideoUrl: row.sample_video_url || '',
     r2Key: row.r2_key || '',
-    previewSoundType: row.preview_sound_type || 'whoosh',
+    previewSoundType: row.preview_sound_type || 'none',
     isBundle: Boolean(row.is_bundle),
     description: row.description || '',
   }
@@ -104,7 +107,11 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
   }
   if (prod.features !== undefined) row.features = prod.features
   if (prod.compatibility !== undefined) row.compatibility = prod.compatibility
-  if (prod.format !== undefined) row.format = prod.format
+  if (prod.fileFormats !== undefined && Array.isArray(prod.fileFormats)) {
+    row.format = prod.fileFormats.join(', ')
+  } else if (prod.format !== undefined) {
+    row.format = prod.format
+  }
   if (prod.fileSize !== undefined) row.file_size = prod.fileSize
   if (prod.downloadCount !== undefined) row.download_count = prod.downloadCount
   if (prod.defaultWeTransferLink !== undefined) row.default_wetransfer_link = prod.defaultWeTransferLink

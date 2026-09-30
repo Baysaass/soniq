@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { STORE_PRODUCTS } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
+import { FileFormatBadgeList } from '@/components/store/file-format-badge'
 
 export function StoreProductGrid() {
   const {
@@ -174,9 +175,20 @@ export function StoreProductGrid() {
                   </div>
 
                   {/* Title & Category */}
-                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono mb-1">
-                    <span className="uppercase">{product.category}</span>
-                    <span>{product.fileSize}</span>
+                  <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono mb-1.5 gap-2">
+                    <span className="uppercase tracking-wider shrink-0">{product.category}</span>
+                    {(() => {
+                      const fmts = Array.isArray(product.fileFormats) && product.fileFormats.length > 0
+                        ? product.fileFormats
+                        : (product.format ? product.format.split(',').map((s) => s.trim()).filter(Boolean) : [])
+                      if (fmts.length > 0) {
+                        return <FileFormatBadgeList formats={fmts} size="xs" max={2} />
+                      }
+                      if (product.fileSize) {
+                        return <span className="truncate">{product.fileSize}</span>
+                      }
+                      return null
+                    })()}
                   </div>
 
                   <Link
@@ -236,7 +248,11 @@ export function StoreProductGrid() {
                     href={`/shop/product/${product.slug}`}
                     className="mt-2 text-[10px] font-medium text-zinc-400 hover:text-[#0088CC] flex items-center justify-center gap-1 transition-colors"
                   >
-                    <span>Дэлгэрэнгүй & Сонсох</span>
+                    <span>
+                      {product.previewSoundType && product.previewSoundType !== 'none'
+                        ? 'Дэлгэрэнгүй & Сонсох'
+                        : 'Дэлгэрэнгүй үзэх'}
+                    </span>
                     <ArrowRight className="w-2.5 h-2.5" />
                   </Link>
                 </div>
