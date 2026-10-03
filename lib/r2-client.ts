@@ -107,6 +107,13 @@ export async function testR2Connection(override?: Partial<R2Config>): Promise<{ 
       }
     }
 
+    if (errCode === 'Unauthorized' || errMsg.includes('Unauthorized')) {
+      return {
+        success: false,
+        message: 'R2 Token хүчингүй байна (401 Unauthorized). Хэрэв та хуучин токеноо устгасан бол Cloudflare дээр шинээр үүсгэсэн Token-ийн Access Key ID болон Secret Access Key-ээ "Тохиргоо" цэсэнд оруулж хадгална уу.',
+      }
+    }
+
     return {
       success: false,
       message: `R2 холболт амжилтгүй: ${errMsg || 'Нэвтрэх эрх эсвэл bucket нэр буруу байна.'}`,
