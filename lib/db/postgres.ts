@@ -76,6 +76,7 @@ function mapProductRow(row: any): StoreProduct {
     previewSoundType: row.preview_sound_type || 'none',
     isBundle: Boolean(row.is_bundle),
     description: row.description || '',
+    notice: row.notice || '',
   }
 }
 

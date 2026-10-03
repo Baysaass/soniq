@@ -81,6 +81,7 @@ function mapProductRow(row: any): StoreProduct {
     previewSoundType: row.preview_sound_type || 'none',
     isBundle: Boolean(row.is_bundle),
     description: row.description || '',
+    notice: row.notice || '',
   }
 }
 
@@ -120,6 +121,7 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
   if (prod.previewSoundType !== undefined) row.preview_sound_type = prod.previewSoundType
   if (prod.isBundle !== undefined) row.is_bundle = prod.isBundle
   if (prod.description !== undefined) row.description = prod.description
+  if (prod.notice !== undefined) row.notice = prod.notice
   row.updated_at = new Date().toISOString()
   return row
 }

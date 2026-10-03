@@ -45,8 +45,11 @@ import {
   Loader2,
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
+  AlertTriangle,
+  FolderPlus,
+  Tag,
 } from 'lucide-react'
-import { STORE_SETTINGS, StoreProduct } from '@/lib/store-data'
+import { STORE_SETTINGS, StoreProduct, StoreCategory, DEFAULT_STORE_CATEGORIES } from '@/lib/store-data'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
 import { R2FileUploader } from '@/components/admin/r2-file-uploader'
 import { convertImageFileToWebP } from '@/lib/image-utils'
@@ -64,6 +67,7 @@ interface StoreSettingsState {
   currencyDefault: 'MNT' | 'USD'
   adminPasscode: string
   announcementText: string
+  categories?: StoreCategory[]
   bankInfo: {
     bankName: string
     accountNumber: string
@@ -144,6 +148,7 @@ export default function AdminPage() {
   // Settings State
   const [settings, setSettings] = useState<StoreSettingsState>({
     ...STORE_SETTINGS,
+    categories: DEFAULT_STORE_CATEGORIES,
     announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
     r2Config: {
       accountId: '',
@@ -157,6 +162,8 @@ export default function AdminPage() {
     resendApiKey: '',
     emailFrom: '',
   })
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [newCategoryId, setNewCategoryId] = useState('')
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [testingR2, setTestingR2] = useState(false)
@@ -436,6 +443,9 @@ export default function AdminPage() {
             telegramChatId: data.settings.telegramChatId || data.settings.bankInfo?.telegramChatId || '',
             resendApiKey: data.settings.resendApiKey || '',
             emailFrom: data.settings.emailFrom || '',
+            categories: (data.settings.categories && data.settings.categories.length > 0)
+              ? data.settings.categories
+              : (prev.categories && prev.categories.length > 0 ? prev.categories : DEFAULT_STORE_CATEGORIES),
           }))
         }
       }
@@ -544,6 +554,7 @@ export default function AdminPage() {
       isBundle: false,
       sampleVideoUrl: '',
       r2Key: '',
+      notice: '',
     })
     setProductModalError('')
     setIsProductModalOpen(true)
@@ -566,6 +577,7 @@ export default function AdminPage() {
       fileFormats: parsedFormats,
       features: Array.isArray(prod.features) && prod.features.length > 0 ? prod.features : [''],
       previewSoundType: prod.previewSoundType || 'none',
+      notice: prod.notice || '',
     })
     setProductModalError('')
     setIsProductModalOpen(true)
@@ -1159,11 +1171,14 @@ export default function AdminPage() {
             <div className="bg-white border border-[#E6E6E3] rounded-xl p-3 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
               <div className="flex items-center gap-1.5 overflow-x-auto">
                 {[
-                  { key: 'all', label: 'Бүгд' },
-                  { key: 'sfx', label: 'Sound FX' },
-                  { key: 'luts', label: 'LUTs' },
-                  { key: 'plugins', label: 'Plugins & Presets' },
-                  { key: 'templates', label: 'Templates' },
+                  { key: 'all', label: `Бүгд (${products.length})` },
+                  ...((settings?.categories && settings.categories.length > 0
+                    ? settings.categories
+                    : DEFAULT_STORE_CATEGORIES
+                  ).map((c) => ({
+                    key: c.id,
+                    label: `${c.name} (${products.filter((p) => p.category === c.id).length})`,
+                  }))),
                 ].map((cat) => (
                   <button
                     key={cat.key}
@@ -1778,6 +1793,128 @@ export default function AdminPage() {
                   placeholder="Бүх багц 85% хямдралтай · WeTransfer шууд таталт"
                   className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                 />
+              </div>
+
+              {/* Dynamic Category Management Section */}
+              <div className="p-4 bg-[#FAFAFA] rounded-xl border border-[#E6E6E3] space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 font-bold text-zinc-800 text-xs">
+                      <FolderPlus className="w-4 h-4 text-[#0088CC]" />
+                      <span>Дэлгүүрийн ангилал удирдах (Product Categories)</span>
+                    </div>
+                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                      Энд шинэ ангилал нэмэх эсвэл хасахад дэлгүүрийн нүүр хуудасны шүүлтүүр болон бүтээгдэхүүн нэмэх цэсэнд шууд шинэчлэгдэнэ.
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold">
+                    {(settings.categories || DEFAULT_STORE_CATEGORIES).length} ангилал
+                  </span>
+                </div>
+
+                {/* List of existing categories */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {(settings.categories || DEFAULT_STORE_CATEGORIES).map((cat, idx) => {
+                    const productCount = products.filter((p) => p.category === cat.id).length
+                    return (
+                      <div
+                        key={cat.id || idx}
+                        className="flex items-center justify-between p-2.5 bg-white rounded-lg border border-zinc-200 text-xs"
+                      >
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <Tag className="w-3.5 h-3.5 text-[#0088CC] shrink-0" />
+                          <div className="truncate">
+                            <span className="font-semibold text-zinc-800 block truncate">{cat.name}</span>
+                            <span className="text-[10px] text-zinc-400 font-mono">
+                              ID: {cat.id} · {productCount} бүтээгдэхүүн
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (confirm(`"${cat.name}" ангиллыг хасах уу?`)) {
+                              const cur = settings.categories || DEFAULT_STORE_CATEGORIES
+                              const updated = cur.filter((c) => c.id !== cat.id)
+                              setSettings({
+                                ...settings,
+                                categories: updated,
+                              })
+                            }
+                          }}
+                          className="p-1 text-zinc-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors cursor-pointer shrink-0 ml-2"
+                          title="Ангилал хасах"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Add new category inputs */}
+                <div className="pt-2 border-t border-zinc-200/80">
+                  <span className="text-[11px] font-semibold text-zinc-700 block mb-1.5">
+                    + Шинэ ангилал нэмэх:
+                  </span>
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Нэр (Жишээ: Fonts, 3D Assets, Video FX)"
+                      value={newCategoryName}
+                      onChange={(e) => {
+                        setNewCategoryName(e.target.value)
+                        if (!newCategoryId || newCategoryId === newCategoryName.toLowerCase().trim().replace(/[^a-z0-9]/g, '')) {
+                          setNewCategoryId(
+                            e.target.value
+                              .toLowerCase()
+                              .trim()
+                              .replace(/[^a-z0-9]/g, '')
+                          )
+                        }
+                      }}
+                      className="w-full sm:flex-1 px-3 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="ID (Жишээ: fonts, 3d, vfx)"
+                      value={newCategoryId}
+                      onChange={(e) => setNewCategoryId(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+                      className="w-full sm:w-40 px-3 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = newCategoryName.trim()
+                        const id = newCategoryId.trim().toLowerCase() || name.toLowerCase().replace(/[^a-z0-9]/g, '')
+                        if (!name) {
+                          alert('Ангиллын нэрийг оруулна уу.')
+                          return
+                        }
+                        if (!id) {
+                          alert('Ангиллын ID оруулна уу.')
+                          return
+                        }
+                        const cur = settings.categories || DEFAULT_STORE_CATEGORIES
+                        if (cur.some((c) => c.id === id)) {
+                          alert(`"${id}" ID-тай ангилал аль хэдийн бүртгэгдсэн байна.`)
+                          return
+                        }
+                        setSettings({
+                          ...settings,
+                          categories: [...cur, { id, name }],
+                        })
+                        setNewCategoryName('')
+                        setNewCategoryId('')
+                      }}
+                      className="w-full sm:w-auto py-1.8 px-4 rounded-lg bg-[#141414] hover:bg-black text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Нэмэх</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Social Support Links */}
@@ -2490,18 +2627,45 @@ export default function AdminPage() {
                 />
               </div>
 
+              {/* Optional Warning / Notice Banner Input */}
+              <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold text-amber-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Анхааруулга &amp; Санамж бичиг (Сонголттой - Заавал биш)</span>
+                  </label>
+                  <span className="text-[10px] text-amber-700 font-medium">
+                    {editingProduct.notice ? 'Бөглөсөн' : 'Хоосон байж болно'}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={editingProduct.notice || ''}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, notice: e.target.value })}
+                  placeholder="Жишээ: Монгол хэлний Ө, Ү үсэг ороогүй тул зөвхөн орос кирилл дэмжинэ / Тусгай программ шаардлагатай гэх мэт..."
+                  className="w-full px-3 py-1.8 rounded-lg bg-white border border-amber-300/80 text-xs text-zinc-900 focus:outline-none focus:border-amber-500"
+                />
+                <p className="text-[10px] text-amber-800/80">
+                  💡 Хэрэв энд анхааруулга бичвэл, дэлгүүрийн нүүрний онцлох багц болон бүтээгдэхүүний дэлгэрэнгүй хуудсанд шар өнгийн анхааруулгын карт болж онцгойлон харагдана.
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Ангилал</label>
                   <select
                     value={editingProduct.category || 'sfx'}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value as any })}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                   >
-                    <option value="sfx">Sound FX</option>
-                    <option value="luts">LUTs & Өнгө</option>
-                    <option value="plugins">Plugins</option>
-                    <option value="templates">Templates</option>
+                    {(settings.categories && settings.categories.length > 0
+                      ? settings.categories
+                      : DEFAULT_STORE_CATEGORIES
+                    ).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

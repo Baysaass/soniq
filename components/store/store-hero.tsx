@@ -13,6 +13,8 @@ import {
   Music2,
   Palette,
   Cpu,
+  AlertTriangle,
+  CheckCircle2,
 } from 'lucide-react'
 import { ULTIMATE_BUNDLE } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
@@ -176,25 +178,56 @@ export function StoreHero() {
                   {currentBundle.subtitle}
                 </p>
 
-                {/* 4 bullet points */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3.5 text-xs text-zinc-700">
-                  <div className="flex items-center gap-2 bg-[#F7F7F5] p-2 rounded-lg border border-[#E6E6E3]">
-                    <Sparkles className="w-3.5 h-3.5 text-[#00B0FF] shrink-0" />
-                    <span className="text-[11px] font-medium">Бүх багцын SFX дуу авиа</span>
+                {/* Optional Warning / Notice Banner */}
+                {currentBundle.notice && currentBundle.notice.trim() && (
+                  <div className="mt-2.5 p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="leading-snug">
+                      <span className="font-bold text-amber-900 block text-[11px] uppercase tracking-wide">
+                        Анхааруулга &amp; Санамж:
+                      </span>
+                      <span className="text-[11px] text-amber-800">
+                        {currentBundle.notice}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 bg-[#F7F7F5] p-2 rounded-lg border border-[#E6E6E3]">
-                    <Download className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="text-[11px] font-medium">WeTransfer өндөр хурдны шууд таталт</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-[#F7F7F5] p-2 rounded-lg border border-[#E6E6E3]">
-                    <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                    <span className="text-[11px] font-medium">100% Royalty Free арилжааны лиценз</span>
-                  </div>
-                  <div className="flex items-center gap-2 bg-[#F7F7F5] p-2 rounded-lg border border-[#E6E6E3]">
-                    <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span className="text-[11px] font-medium">Шинэ дуунууд насан туршдаа үнэгүй</span>
-                  </div>
-                </div>
+                )}
+
+                {/* 4 bullet points (dynamic per product features) */}
+                {(() => {
+                  const defaultFeatures = [
+                    'Бүх багцын SFX дуу авиа',
+                    'WeTransfer өндөр хурдны шууд таталт',
+                    '100% Royalty Free арилжааны лиценз',
+                    'Шинэ дуунууд насан туршдаа үнэгүй',
+                  ]
+                  const rawFeatures = Array.isArray(currentBundle.features) && currentBundle.features.length > 0
+                    ? currentBundle.features.filter((f) => f && f.trim().length > 0)
+                    : defaultFeatures
+                  const displayFeatures = rawFeatures.length > 0 ? rawFeatures.slice(0, 4) : defaultFeatures
+                  const featureIcons = [
+                    <Sparkles key="f1" className="w-3.5 h-3.5 text-[#00B0FF] shrink-0" />,
+                    <Download key="f2" className="w-3.5 h-3.5 text-emerald-600 shrink-0" />,
+                    <ShieldCheck key="f3" className="w-3.5 h-3.5 text-indigo-600 shrink-0" />,
+                    <Layers key="f4" className="w-3.5 h-3.5 text-amber-600 shrink-0" />,
+                  ]
+
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3.5 text-xs text-zinc-700">
+                      {displayFeatures.map((feat, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center gap-2 bg-[#F7F7F5] p-2 rounded-lg border border-[#E6E6E3]"
+                        >
+                          {featureIcons[idx % featureIcons.length]}
+                          <span className="text-[11px] font-medium truncate" title={feat}>
+                            {feat}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
 
                 {/* Price & Purchase CTA */}
                 <div className="mt-4 pt-3.5 border-t border-[#E6E6E3] flex items-center justify-between flex-wrap gap-3">

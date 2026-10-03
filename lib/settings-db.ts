@@ -10,12 +10,16 @@ export interface R2Config {
   publicDomain?: string
 }
 
+import type { StoreCategory } from './store-data'
+export type { StoreCategory }
+
 export interface StoreSettingsType {
   storeName: string
   subdomain: string
   currencyDefault: 'MNT' | 'USD'
   adminPasscode: string
   announcementText: string
+  categories?: StoreCategory[]
   bankInfo: {
     bankName: string
     accountNumber: string

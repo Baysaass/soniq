@@ -3,7 +3,7 @@ export interface StoreProduct {
   slug: string
   title: string
   subtitle: string
-  category: 'sfx' | 'plugins' | 'luts' | 'templates'
+  category: string
   badge?: string
   rating: number
   reviewCount: number
@@ -25,13 +25,27 @@ export interface StoreProduct {
   description: string
   sampleVideoUrl?: string
   r2Key?: string
+  notice?: string // Optional warning / notice text
 }
+
+export interface StoreCategory {
+  id: string
+  name: string
+}
+
+export const DEFAULT_STORE_CATEGORIES: StoreCategory[] = [
+  { id: 'sfx', name: 'Sound FX' },
+  { id: 'luts', name: 'LUTs & Өнгө' },
+  { id: 'plugins', name: 'Plugins & Presets' },
+  { id: 'templates', name: 'Templates & Fonts' },
+]
 
 export const STORE_SETTINGS = {
   storeName: 'SONIQ STORE',
   subdomain: 'shop.soniq.click',
   currencyDefault: 'MNT' as const,
   adminPasscode: 'Amirda700+',
+  categories: DEFAULT_STORE_CATEGORIES,
   bankInfo: {
     bankName: 'Хаан Банк (Khan Bank)',
     accountNumber: '5608120471',

@@ -15,6 +15,7 @@ import {
   Film,
   Music2,
   Palette,
+  AlertTriangle,
 } from 'lucide-react'
 import { STORE_PRODUCTS, ULTIMATE_BUNDLE, StoreProduct } from '@/lib/store-data'
 import { StoreProvider, useStore } from '@/lib/store-context'
@@ -224,6 +225,21 @@ function ProductDetailContent({ slug }: { slug: string }) {
               <p className="text-xs text-zinc-500 mt-2 leading-relaxed">
                 {product.description}
               </p>
+
+              {/* Optional Notice / Warning Banner */}
+              {product.notice && product.notice.trim() && (
+                <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <span className="font-bold text-amber-900 block text-[11px] uppercase tracking-wide">
+                      Анхааруулга &amp; Санамж:
+                    </span>
+                    <span className="text-[12px] text-amber-800">
+                      {product.notice}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {/* Highlights checklist */}
               <div className="space-y-1.5 my-3.5 pt-3 border-t border-[#E6E6E3] text-xs text-zinc-700">

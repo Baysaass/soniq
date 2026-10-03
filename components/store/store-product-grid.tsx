@@ -24,6 +24,7 @@ export function StoreProductGrid() {
     openCheckoutWithProduct,
     formatPrice,
     cart,
+    settings,
   } = useStore()
 
   const [activeTab, setActiveTab] = useState<string>('all')
@@ -42,15 +43,25 @@ export function StoreProductGrid() {
     return true
   })
 
-  const sfxCount = (products || []).filter((p) => p.category === 'sfx').length
-  const lutsCount = (products || []).filter((p) => p.category === 'luts').length
-  const pluginsCount = (products || []).filter((p) => p.category === 'plugins').length
+  // Dynamic categories from settings with fallback
+  const storeCategories = (settings?.categories && settings.categories.length > 0)
+    ? settings.categories
+    : [
+        { id: 'sfx', name: 'Sound FX' },
+        { id: 'luts', name: 'LUTs & Өнгө' },
+        { id: 'plugins', name: 'Presets & Хэрэгслүүд' },
+        { id: 'templates', name: 'Templates & Fonts' },
+      ]
 
   const categories = [
     { key: 'all', label: `Бүгд (${(products || []).length})` },
-    { key: 'sfx', label: `Sound FX (${sfxCount})` },
-    { key: 'luts', label: `LUTs & Өнгө (${lutsCount})` },
-    { key: 'plugins', label: `Presets & Хэрэгслүүд (${pluginsCount})` },
+    ...storeCategories.map((c) => {
+      const count = (products || []).filter((p) => p.category === c.id).length
+      return {
+        key: c.id,
+        label: `${c.name} (${count})`,
+      }
+    }),
   ]
 
   const isItemInCart = (id: string) => cart.some((item) => item.product.id === id)
