@@ -30,6 +30,8 @@ export interface StoreSettingsType {
   r2Config?: R2Config
   telegramBotToken?: string
   telegramChatId?: string
+  resendApiKey?: string
+  emailFrom?: string
 }
 
 export async function getStoreSettingsAsync(): Promise<StoreSettingsType> {

@@ -10,9 +10,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Нууц үг буруу байна' }, { status: 401 })
   }
 
-  const hasKey = Boolean(process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim().length > 0)
-  const keyPrefix = hasKey ? `${process.env.RESEND_API_KEY!.slice(0, 6)}...` : 'Тохируулаагүй'
-  const emailFrom = process.env.EMAIL_FROM || 'SONIQ STORE <onboarding@resend.dev>'
+  const settings = await db.getSettings()
+  const apiKey = settings.resendApiKey?.trim() || process.env.RESEND_API_KEY?.trim()
+  const hasKey = Boolean(apiKey && apiKey.length > 0)
+  const keyPrefix = hasKey ? `${apiKey!.slice(0, 6)}...` : 'Тохируулаагүй'
+  const emailFrom = settings.emailFrom?.trim() || process.env.EMAIL_FROM?.trim() || 'SONIQ STORE <onboarding@resend.dev>'
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.soniq.click'
 
   return NextResponse.json({
@@ -38,19 +40,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Зөв и-мэйл хаяг оруулна уу' }, { status: 400 })
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY
+    const bodyApiKey = typeof body.resendApiKey === 'string' ? body.resendApiKey.trim() : ''
+    const bodyEmailFrom = typeof body.emailFrom === 'string' ? body.emailFrom.trim() : ''
+
+    const settings = await db.getSettings()
+    const resendApiKey = bodyApiKey || settings.resendApiKey?.trim() || process.env.RESEND_API_KEY?.trim()
     if (!resendApiKey) {
       return NextResponse.json(
         {
           success: false,
-          error: 'RESEND_API_KEY Vercel Environment Variables дээр бүртгэгдээгүй байна.',
-          suggestion: 'Vercel -> Settings -> Environment Variables дээр RESEND_API_KEY нэмээд Redeploy хийнэ үү.',
+          error: 'RESEND_API_KEY тохируулагдаагүй байна.',
+          suggestion: 'Админ "Тохиргоо" цэсний "И-мэйл үйлчилгээ" хэсэгт Resend API түлхүүрээ оруулж хадгална уу.',
         },
         { status: 400 }
       )
     }
 
-    const emailFrom = process.env.EMAIL_FROM || 'SONIQ STORE <onboarding@resend.dev>'
+    const emailFrom = bodyEmailFrom || settings.emailFrom?.trim() || process.env.EMAIL_FROM?.trim() || 'SONIQ STORE <onboarding@resend.dev>'
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',

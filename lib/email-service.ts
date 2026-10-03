@@ -439,18 +439,18 @@ async function sendViaResend(params: {
   subject: string
   html: string
 }): Promise<{ success: boolean; messageId?: string; error?: string; fromUsed?: string }> {
-  const configuredFrom = process.env.EMAIL_FROM?.trim()
+  const settings = getStoreSettings()
+  const configuredFrom = settings.emailFrom?.trim() || process.env.EMAIL_FROM?.trim()
   // Candidates in priority order:
-  // If user configured EMAIL_FROM, try it first, then fallback to onboarding@resend.dev if unverified domain error occurs
   const candidates: string[] = []
   if (configuredFrom) {
     candidates.push(configuredFrom)
   }
-  if (!candidates.includes('SONIQ STORE <onboarding@resend.dev>')) {
-    candidates.push('SONIQ STORE <onboarding@resend.dev>')
-  }
   if (!candidates.includes('SONIQ STORE <order@soniq.click>')) {
     candidates.push('SONIQ STORE <order@soniq.click>')
+  }
+  if (!candidates.includes('SONIQ STORE <onboarding@resend.dev>')) {
+    candidates.push('SONIQ STORE <onboarding@resend.dev>')
   }
 
   let lastError = ''
@@ -475,17 +475,22 @@ async function sendViaResend(params: {
         return { success: true, messageId: resData.id, fromUsed: fromAddress }
       }
 
-      lastError = resData?.message || resData?.error || `HTTP ${res.status}`
-      console.warn(`Resend attempt failed with from="${fromAddress}":`, lastError)
+      const rawMsg = resData?.message || resData?.error || `HTTP ${res.status}`
+      lastError = rawMsg
+      console.warn(`Resend attempt failed with from="${fromAddress}":`, rawMsg)
+
+      if (rawMsg.includes('testing emails to your own email address')) {
+        lastError = `Resend туршилтын горимд байна (onboarding@resend.dev нь зөвхөн Resend-д бүртгэлтэй өөрийн и-мэйл рүү илгээдэг). Бусад хэрэглэгчид рүү илгээхийн тулд resend.com/domains дээр домэйноо бүртгэж баталгаажуулна уу.`
+        break
+      }
 
       // If the error indicates domain is not verified, try next candidate (onboarding@resend.dev)
       const isDomainIssue =
-        lastError.toLowerCase().includes('domain') ||
-        lastError.toLowerCase().includes('not verified') ||
-        lastError.toLowerCase().includes('verify')
+        rawMsg.toLowerCase().includes('domain') ||
+        rawMsg.toLowerCase().includes('not verified') ||
+        rawMsg.toLowerCase().includes('verify')
 
       if (!isDomainIssue && candidates.indexOf(fromAddress) === 0 && !configuredFrom) {
-        // If not domain issue and no custom config, continue trying
         continue
       }
     } catch (e: any) {
@@ -522,8 +527,9 @@ export async function sendOrderCreatedEmail(params: {
   const html = buildOrderCreatedEmailHtml({ order, siteUrl })
   const subject = `[SONIQ STORE] Захиалга хүлээн авлаа — Төлбөрийн заавар (#${order.id})`
 
-  const resendApiKey = process.env.RESEND_API_KEY
-  if (resendApiKey && resendApiKey.trim().length > 0) {
+  const settings = getStoreSettings()
+  const resendApiKey = settings.resendApiKey?.trim() || process.env.RESEND_API_KEY?.trim()
+  if (resendApiKey && resendApiKey.length > 0) {
     const res = await sendViaResend({
       apiKey: resendApiKey,
       to: order.customerEmail,
@@ -576,7 +582,7 @@ export async function sendOrderCreatedEmail(params: {
   return {
     success: false,
     provider: 'not-configured',
-    error: 'RESEND_API_KEY тохируулагдаагүй байна.',
+    error: 'RESEND_API_KEY тохируулагдаагүй байна. Админ "Тохиргоо" цэснээс эсвэл Vercel дээр RESEND_API_KEY оруулна уу.',
     messageId: mockId,
     recipient: order.customerEmail,
     previewHtml: html,
@@ -650,9 +656,10 @@ export async function sendOrderApprovedEmail(params: {
 
   const subject = `[SONIQ STORE] Таны захиалга баталгаажлаа! — Татах холбоос (#${order.id})`
 
-  // 1. Try Resend if RESEND_API_KEY is configured
-  const resendApiKey = process.env.RESEND_API_KEY
-  if (resendApiKey && resendApiKey.trim().length > 0) {
+  // 1. Try Resend if configured in settings or environment variables
+  const settings = getStoreSettings()
+  const resendApiKey = settings.resendApiKey?.trim() || process.env.RESEND_API_KEY?.trim()
+  if (resendApiKey && resendApiKey.length > 0) {
     const res = await sendViaResend({
       apiKey: resendApiKey,
       to: order.customerEmail,
@@ -719,7 +726,7 @@ export async function sendOrderApprovedEmail(params: {
   return {
     success: false,
     provider: 'not-configured',
-    error: 'Vercel Settings -> Environment Variables дээр RESEND_API_KEY болон EMAIL_FROM тохируулагдаагүй байна.',
+    error: 'RESEND_API_KEY тохируулагдаагүй байна. Админ "Тохиргоо" цэснээс эсвэл Vercel дээр RESEND_API_KEY оруулна уу.',
     messageId: mockId,
     recipient: order.customerEmail,
     previewHtml: html,

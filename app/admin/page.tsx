@@ -82,6 +82,8 @@ interface StoreSettingsState {
   }
   telegramBotToken?: string
   telegramChatId?: string
+  resendApiKey?: string
+  emailFrom?: string
 }
 
 export default function AdminPage() {
@@ -152,6 +154,8 @@ export default function AdminPage() {
     },
     telegramBotToken: '',
     telegramChatId: '',
+    resendApiKey: '',
+    emailFrom: '',
   })
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
@@ -290,6 +294,8 @@ export default function AdminPage() {
         body: JSON.stringify({
           passcode,
           testEmail: testEmailInput.trim(),
+          resendApiKey: settings.resendApiKey,
+          emailFrom: settings.emailFrom,
         }),
       })
       const data = await res.json()
@@ -428,6 +434,8 @@ export default function AdminPage() {
             },
             telegramBotToken: data.settings.telegramBotToken || data.settings.bankInfo?.telegramBotToken || '',
             telegramChatId: data.settings.telegramChatId || data.settings.bankInfo?.telegramChatId || '',
+            resendApiKey: data.settings.resendApiKey || '',
+            emailFrom: data.settings.emailFrom || '',
           }))
         }
       }
@@ -2191,15 +2199,48 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                      Resend API Key (re_...)
+                    </label>
+                    <input
+                      type="password"
+                      value={settings.resendApiKey || ''}
+                      onChange={(e) => setSettings({ ...settings, resendApiKey: e.target.value })}
+                      placeholder="re_123456789... (resend.com дээрээс авна)"
+                      className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                    />
+                    <p className="text-[10px] text-zinc-400 mt-1">
+                      Vercel эсвэл энд оруулж &quot;Тохиргоо хадгалах&quot; товчийг дарна
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                      Илгээгчийн нэр &amp; хаяг (EMAIL_FROM)
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.emailFrom || ''}
+                      onChange={(e) => setSettings({ ...settings, emailFrom: e.target.value })}
+                      placeholder="SONIQ STORE <order@soniq.click>"
+                      className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                    />
+                    <p className="text-[10px] text-zinc-400 mt-1">
+                      Үндсэн: <code className="text-zinc-600">SONIQ STORE &lt;order@soniq.click&gt;</code>
+                    </p>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 text-xs">
                   <div className="p-2.5 rounded-lg bg-white border border-[#E6E6E3]">
                     <span className="text-[10px] text-zinc-400 block font-mono">ИЛГЭЭХ ХАЯГ (EMAIL_FROM)</span>
                     <span className="font-bold text-zinc-800 font-mono text-[11px] block truncate">
-                      {emailStatus?.emailFrom || 'Тодорхойгүй'}
+                      {settings.emailFrom || emailStatus?.emailFrom || 'SONIQ STORE <order@soniq.click>'}
                     </span>
-                    {emailStatus?.isUsingDefaultOnboarding && (
+                    {(settings.emailFrom || emailStatus?.emailFrom)?.includes('onboarding@resend.dev') && (
                       <span className="text-[10px] text-amber-600 block mt-0.5">
-                        ⚠️ Анхаар: onboarding@resend.dev хаягаар зөвхөн Resend-д бүртгэлтэй өөрийн и-мэйл рүү туршилт хийж болно. Хэрэглэгчид рүү илгээхийн тулд Vercel дээр EMAIL_FROM=SONIQ STORE &lt;order@soniq.click&gt; гэж тохируулна.
+                        ⚠️ Анхаар: onboarding@resend.dev хаягаар зөвхөн Resend-д бүртгэлтэй өөрийн и-мэйл рүү туршилт хийж болно. Хэрэглэгчид рүү илгээхийн тулд resend.com/domains дээр soniq.click домэйноо холбох хэрэгтэй.
                       </span>
                     )}
                   </div>

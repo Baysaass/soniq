@@ -19,8 +19,8 @@ export async function GET(req: Request) {
       })
     }
 
-    // Public visitor view: strip secrets (passcode, telegram credentials, R2 secret access keys)
-    const { adminPasscode, telegramBotToken, telegramChatId, r2Config, ...publicSettings } = settings
+    // Public visitor view: strip secrets (passcode, telegram credentials, R2 secret access keys, Resend API key)
+    const { adminPasscode, telegramBotToken, telegramChatId, r2Config, resendApiKey, ...publicSettings } = settings
     const safeBankInfo = { ...(publicSettings.bankInfo || {}) }
     delete (safeBankInfo as any).telegramBotToken
     delete (safeBankInfo as any).telegramChatId
