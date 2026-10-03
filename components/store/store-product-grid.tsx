@@ -12,7 +12,7 @@ import {
   Film,
   Layers,
 } from 'lucide-react'
-import { STORE_PRODUCTS } from '@/lib/store-data'
+import { STORE_PRODUCTS, DEFAULT_STORE_CATEGORIES, StoreCategory } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
 import { FileFormatBadgeList } from '@/components/store/file-format-badge'
 
@@ -30,8 +30,37 @@ export function StoreProductGrid() {
   const [activeTab, setActiveTab] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
 
+  // Base categories from settings or defaults
+  const baseCategories: StoreCategory[] = (settings?.categories && settings.categories.length > 0)
+    ? settings.categories
+    : DEFAULT_STORE_CATEGORIES
+
+  // Collect all unique categories, guaranteeing any custom category present in products is displayed
+  const categoryMap = new Map<string, StoreCategory>()
+  baseCategories.forEach((c) => {
+    if (c && c.id) {
+      categoryMap.set(c.id.toLowerCase().trim(), { id: c.id.trim(), name: c.name.trim() })
+    }
+  })
+
+  ;(products || []).forEach((p) => {
+    if (p.category && p.category.trim()) {
+      const key = p.category.toLowerCase().trim()
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, {
+          id: p.category.trim(),
+          name: p.category.trim().charAt(0).toUpperCase() + p.category.trim().slice(1),
+        })
+      }
+    }
+  })
+
+  const storeCategories = Array.from(categoryMap.values())
+
   const filteredProducts = (products || []).filter((product) => {
-    if (activeTab !== 'all' && product.category !== activeTab) return false
+    if (activeTab !== 'all' && (product.category || '').toLowerCase().trim() !== activeTab.toLowerCase().trim()) {
+      return false
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
       return (
@@ -43,20 +72,12 @@ export function StoreProductGrid() {
     return true
   })
 
-  // Dynamic categories from settings with fallback
-  const storeCategories = (settings?.categories && settings.categories.length > 0)
-    ? settings.categories
-    : [
-        { id: 'sfx', name: 'Sound FX' },
-        { id: 'luts', name: 'LUTs & Өнгө' },
-        { id: 'plugins', name: 'Presets & Хэрэгслүүд' },
-        { id: 'templates', name: 'Templates & Fonts' },
-      ]
-
   const categories = [
     { key: 'all', label: `Бүгд (${(products || []).length})` },
     ...storeCategories.map((c) => {
-      const count = (products || []).filter((p) => p.category === c.id).length
+      const count = (products || []).filter(
+        (p) => (p.category || '').toLowerCase().trim() === c.id.toLowerCase().trim()
+      ).length
       return {
         key: c.id,
         label: `${c.name} (${count})`,
@@ -187,7 +208,9 @@ export function StoreProductGrid() {
 
                   {/* Title & Category */}
                   <div className="flex items-center justify-between text-[10px] text-zinc-400 font-mono mb-1.5 gap-2">
-                    <span className="uppercase tracking-wider shrink-0">{product.category}</span>
+                    <span className="uppercase tracking-wider shrink-0 font-semibold text-zinc-500">
+                      {storeCategories.find((c) => c.id.toLowerCase().trim() === (product.category || '').toLowerCase().trim())?.name || product.category}
+                    </span>
                     {(() => {
                       const fmts = Array.isArray(product.fileFormats) && product.fileFormats.length > 0
                         ? product.fileFormats

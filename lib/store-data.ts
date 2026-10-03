@@ -38,6 +38,7 @@ export const DEFAULT_STORE_CATEGORIES: StoreCategory[] = [
   { id: 'luts', name: 'LUTs & Өнгө' },
   { id: 'plugins', name: 'Plugins & Presets' },
   { id: 'templates', name: 'Templates & Fonts' },
+  { id: 'program', name: 'Program' },
 ]
 
 export const STORE_SETTINGS = {

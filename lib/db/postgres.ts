@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import type { StoreProduct, Order, StoreSettingsType } from './types'
+import { DEFAULT_STORE_CATEGORIES } from '../store-data'
 
 function getPostgresUrl(): string {
   return process.env.DATABASE_URL || process.env.POSTGRES_URL || ''
@@ -392,17 +393,26 @@ export const postgresDB = {
       if (res.rows.length === 0) return null
       const data = res.rows[0]
       const bankInfo = data.bank_info || {}
+      const categories = (Array.isArray(data.categories) && data.categories.length > 0)
+        ? data.categories
+        : (Array.isArray(bankInfo.categories) && bankInfo.categories.length > 0)
+          ? bankInfo.categories
+          : DEFAULT_STORE_CATEGORIES
+
       return {
         storeName: data.store_name,
         subdomain: data.subdomain,
         currencyDefault: data.currency_default || 'MNT',
         adminPasscode: data.admin_passcode,
         announcementText: data.announcement_text,
+        categories,
         bankInfo,
         defaultBundleWeTransfer: data.default_bundle_wetransfer || '',
         r2Config: data.r2_config || {},
         telegramBotToken: bankInfo.telegramBotToken || '',
         telegramChatId: bankInfo.telegramChatId || '',
+        resendApiKey: bankInfo.resendApiKey || '',
+        emailFrom: bankInfo.emailFrom || '',
       }
     } catch (err) {
       console.error('PostgreSQL getSettings error:', err)
@@ -418,6 +428,9 @@ export const postgresDB = {
         ...(settings.bankInfo || {}),
         ...(settings.telegramBotToken !== undefined ? { telegramBotToken: settings.telegramBotToken } : {}),
         ...(settings.telegramChatId !== undefined ? { telegramChatId: settings.telegramChatId } : {}),
+        ...(settings.categories !== undefined ? { categories: settings.categories } : {}),
+        ...(settings.resendApiKey !== undefined ? { resendApiKey: settings.resendApiKey } : {}),
+        ...(settings.emailFrom !== undefined ? { emailFrom: settings.emailFrom } : {}),
       }
 
       const query = `

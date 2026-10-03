@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { StoreProduct, Order, StoreSettingsType } from './types'
+import { DEFAULT_STORE_CATEGORIES } from '../store-data'
 
 function getSupabaseCredentials() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -390,17 +391,26 @@ export const supabaseDB = {
     const { data, error } = await supabase.from('store_settings').select('*').eq('id', 'default').maybeSingle()
     if (error || !data) return null
     const bankInfo = data.bank_info || {}
+    const categories = (Array.isArray(data.categories) && data.categories.length > 0)
+      ? data.categories
+      : (Array.isArray(bankInfo.categories) && bankInfo.categories.length > 0)
+        ? bankInfo.categories
+        : DEFAULT_STORE_CATEGORIES
+
     return {
       storeName: data.store_name,
       subdomain: data.subdomain,
       currencyDefault: data.currency_default || 'MNT',
       adminPasscode: data.admin_passcode,
       announcementText: data.announcement_text,
+      categories,
       bankInfo,
       defaultBundleWeTransfer: data.default_bundle_wetransfer || '',
       r2Config: data.r2_config || {},
       telegramBotToken: bankInfo.telegramBotToken || '',
       telegramChatId: bankInfo.telegramChatId || '',
+      resendApiKey: bankInfo.resendApiKey || '',
+      emailFrom: bankInfo.emailFrom || '',
     }
   },
 
@@ -413,15 +423,39 @@ export const supabaseDB = {
     if (settings.currencyDefault !== undefined) row.currency_default = settings.currencyDefault
     if (settings.adminPasscode !== undefined) row.admin_passcode = settings.adminPasscode
     if (settings.announcementText !== undefined) row.announcement_text = settings.announcementText
-    if (settings.bankInfo !== undefined || settings.telegramBotToken !== undefined || settings.telegramChatId !== undefined) {
+
+    // Always store categories, telegram credentials, resend config inside bank_info JSONB
+    // so it is 100% safe from table column mismatch errors
+    if (
+      settings.bankInfo !== undefined ||
+      settings.telegramBotToken !== undefined ||
+      settings.telegramChatId !== undefined ||
+      settings.categories !== undefined ||
+      settings.resendApiKey !== undefined ||
+      settings.emailFrom !== undefined
+    ) {
       row.bank_info = {
         ...(settings.bankInfo || {}),
         ...(settings.telegramBotToken !== undefined ? { telegramBotToken: settings.telegramBotToken } : {}),
         ...(settings.telegramChatId !== undefined ? { telegramChatId: settings.telegramChatId } : {}),
+        ...(settings.categories !== undefined ? { categories: settings.categories } : {}),
+        ...(settings.resendApiKey !== undefined ? { resendApiKey: settings.resendApiKey } : {}),
+        ...(settings.emailFrom !== undefined ? { emailFrom: settings.emailFrom } : {}),
       }
     }
     if (settings.defaultBundleWeTransfer !== undefined) row.default_bundle_wetransfer = settings.defaultBundleWeTransfer
     if (settings.r2Config !== undefined) row.r2_config = settings.r2Config
+
+    // Try upserting with categories column if it exists in the table, otherwise fallback without it
+    if (settings.categories !== undefined) {
+      const rowWithCol = { ...row, categories: settings.categories }
+      const resWithCol = await supabase.from('store_settings').upsert(rowWithCol)
+      if (!resWithCol.error) return true
+      if (resWithCol.error.message && !resWithCol.error.message.includes('column')) {
+        console.error('Supabase saveSettings error:', resWithCol.error)
+        return false
+      }
+    }
 
     const { error } = await supabase.from('store_settings').upsert(row)
     if (error) {

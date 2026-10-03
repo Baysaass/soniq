@@ -17,7 +17,8 @@
     { "id": "sfx", "name": "Sound FX" },
     { "id": "luts", "name": "LUTs & Өнгө" },
     { "id": "plugins", "name": "Presets & Хэрэгслүүд" },
-    { "id": "templates", "name": "Templates & Fonts" }
+    { "id": "templates", "name": "Templates & Fonts" },
+    { "id": "program", "name": "Program" }
   ],
   "r2Config": {
     "accountId": "7f88a4551fd0f8b0d9d22fd6db314f23",

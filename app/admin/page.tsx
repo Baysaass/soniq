@@ -164,6 +164,7 @@ export default function AdminPage() {
   })
   const [newCategoryName, setNewCategoryName] = useState('')
   const [newCategoryId, setNewCategoryId] = useState('')
+  const [savingCategory, setSavingCategory] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [savingSettings, setSavingSettings] = useState(false)
   const [testingR2, setTestingR2] = useState(false)
@@ -734,6 +735,7 @@ export default function AdminPage() {
 
       const payload = {
         ...editingProduct,
+        category: (editingProduct.category || 'sfx').trim(),
         image: currentImgs[0] || '/images/product-morph-3d.png',
         images: currentImgs,
         features: cleanFeatures.length > 0 ? cleanFeatures : ['Өндөр чанарын бүтээгдэхүүн', '100% Royalty Free лиценз'],
@@ -951,9 +953,35 @@ export default function AdminPage() {
     }
   }
 
+  // Auto-save categories immediately when added or removed so changes persist to cloud DB instantly
+  const saveCategoriesImmediately = async (updatedCategories: StoreCategory[]) => {
+    setSettings((prev) => ({ ...prev, categories: updatedCategories }))
+    setSavingCategory(true)
+    try {
+      const activeCode = passcode || (typeof window !== 'undefined' ? sessionStorage.getItem('soniq_admin_passcode') : '') || ''
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          passcode: activeCode,
+          updates: { categories: updatedCategories },
+        }),
+      })
+      if (!res.ok) {
+        console.warn('Auto-save categories failed on server')
+      }
+    } catch (err) {
+      console.error('Failed to auto-save categories:', err)
+    } finally {
+      setSavingCategory(false)
+    }
+  }
+
   // Filter products
   const filteredProducts = products.filter((p) => {
-    if (productCategoryFilter !== 'all' && p.category !== productCategoryFilter) return false
+    if (productCategoryFilter !== 'all' && (p.category || '').toLowerCase().trim() !== productCategoryFilter.toLowerCase().trim()) {
+      return false
+    }
     if (productSearch.trim()) {
       const q = productSearch.toLowerCase()
       return (
@@ -1170,16 +1198,30 @@ export default function AdminPage() {
             {/* Filter & Search Bar */}
             <div className="bg-white border border-[#E6E6E3] rounded-xl p-3 mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
               <div className="flex items-center gap-1.5 overflow-x-auto">
-                {[
-                  { key: 'all', label: `Бүгд (${products.length})` },
-                  ...((settings?.categories && settings.categories.length > 0
+                {(() => {
+                  const baseCats = (settings?.categories && settings.categories.length > 0)
                     ? settings.categories
                     : DEFAULT_STORE_CATEGORIES
-                  ).map((c) => ({
-                    key: c.id,
-                    label: `${c.name} (${products.filter((p) => p.category === c.id).length})`,
-                  }))),
-                ].map((cat) => (
+                  const catMap = new Map<string, StoreCategory>()
+                  baseCats.forEach((c) => catMap.set(c.id.toLowerCase().trim(), c))
+                  products.forEach((p) => {
+                    if (p.category && !catMap.has(p.category.toLowerCase().trim())) {
+                      catMap.set(p.category.toLowerCase().trim(), {
+                        id: p.category.trim(),
+                        name: p.category.trim().charAt(0).toUpperCase() + p.category.trim().slice(1),
+                      })
+                    }
+                  })
+                  const allCats = Array.from(catMap.values())
+
+                  return [
+                    { key: 'all', label: `Бүгд (${products.length})` },
+                    ...allCats.map((c) => ({
+                      key: c.id,
+                      label: `${c.name} (${products.filter((p) => (p.category || '').toLowerCase().trim() === c.id.toLowerCase().trim()).length})`,
+                    })),
+                  ]
+                })().map((cat) => (
                   <button
                     key={cat.key}
                     onClick={() => setProductCategoryFilter(cat.key)}
@@ -1833,17 +1875,15 @@ export default function AdminPage() {
 
                         <button
                           type="button"
+                          disabled={savingCategory}
                           onClick={() => {
                             if (confirm(`"${cat.name}" ангиллыг хасах уу?`)) {
                               const cur = settings.categories || DEFAULT_STORE_CATEGORIES
                               const updated = cur.filter((c) => c.id !== cat.id)
-                              setSettings({
-                                ...settings,
-                                categories: updated,
-                              })
+                              saveCategoriesImmediately(updated)
                             }
                           }}
-                          className="p-1 text-zinc-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors cursor-pointer shrink-0 ml-2"
+                          className="p-1 text-zinc-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors cursor-pointer shrink-0 ml-2 disabled:opacity-50"
                           title="Ангилал хасах"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -1855,9 +1895,17 @@ export default function AdminPage() {
 
                 {/* Add new category inputs */}
                 <div className="pt-2 border-t border-zinc-200/80">
-                  <span className="text-[11px] font-semibold text-zinc-700 block mb-1.5">
-                    + Шинэ ангилал нэмэх:
-                  </span>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-semibold text-zinc-700">
+                      + Шинэ ангилал нэмэх:
+                    </span>
+                    {savingCategory && (
+                      <span className="text-[10px] text-blue-600 flex items-center gap-1 font-semibold">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Шууд үүлэнд хадгалж байна...
+                      </span>
+                    )}
+                  </div>
                   <div className="flex flex-col sm:flex-row items-center gap-2">
                     <input
                       type="text"
@@ -1885,6 +1933,7 @@ export default function AdminPage() {
                     />
                     <button
                       type="button"
+                      disabled={savingCategory}
                       onClick={() => {
                         const name = newCategoryName.trim()
                         const id = newCategoryId.trim().toLowerCase() || name.toLowerCase().replace(/[^a-z0-9]/g, '')
@@ -1897,20 +1946,22 @@ export default function AdminPage() {
                           return
                         }
                         const cur = settings.categories || DEFAULT_STORE_CATEGORIES
-                        if (cur.some((c) => c.id === id)) {
+                        if (cur.some((c) => c.id.toLowerCase() === id.toLowerCase())) {
                           alert(`"${id}" ID-тай ангилал аль хэдийн бүртгэгдсэн байна.`)
                           return
                         }
-                        setSettings({
-                          ...settings,
-                          categories: [...cur, { id, name }],
-                        })
+                        const updated = [...cur, { id, name }]
+                        saveCategoriesImmediately(updated)
                         setNewCategoryName('')
                         setNewCategoryId('')
                       }}
-                      className="w-full sm:w-auto py-1.8 px-4 rounded-lg bg-[#141414] hover:bg-black text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-2xs flex items-center justify-center gap-1.5"
+                      className="w-full sm:w-auto py-1.8 px-4 rounded-lg bg-[#141414] hover:bg-black text-white text-xs font-semibold cursor-pointer shrink-0 transition-colors shadow-2xs flex items-center justify-center gap-1.5 disabled:opacity-50"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      {savingCategory ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="w-3.5 h-3.5" />
+                      )}
                       <span>Нэмэх</span>
                     </button>
                   </div>
@@ -2653,20 +2704,32 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Ангилал</label>
-                  <select
-                    value={editingProduct.category || 'sfx'}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
-                  >
-                    {(settings.categories && settings.categories.length > 0
-                      ? settings.categories
-                      : DEFAULT_STORE_CATEGORIES
-                    ).map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                  {(() => {
+                    const baseCats = (settings.categories && settings.categories.length > 0)
+                      ? [...settings.categories]
+                      : [...DEFAULT_STORE_CATEGORIES]
+                    
+                    const currentCatVal = (editingProduct.category || 'sfx').trim()
+                    const found = baseCats.find((c) => c.id.toLowerCase() === currentCatVal.toLowerCase())
+                    const selectOptions = found
+                      ? baseCats
+                      : [...baseCats, { id: currentCatVal, name: currentCatVal.charAt(0).toUpperCase() + currentCatVal.slice(1) }]
+                    const selectValue = found ? found.id : currentCatVal
+
+                    return (
+                      <select
+                        value={selectValue}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                        className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
+                      >
+                        {selectOptions.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
+                    )
+                  })()}
                 </div>
 
                 <div>

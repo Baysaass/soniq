@@ -84,6 +84,13 @@ CREATE TABLE IF NOT EXISTS store_settings (
     "supportTelegram": "https://t.me/baysaa_vfx"
   }'::jsonb,
   default_bundle_wetransfer TEXT DEFAULT '',
+  categories JSONB DEFAULT '[
+    {"id": "sfx", "name": "Sound FX"},
+    {"id": "luts", "name": "LUTs & Өнгө"},
+    {"id": "plugins", "name": "Plugins & Presets"},
+    {"id": "templates", "name": "Templates & Fonts"},
+    {"id": "program", "name": "Program"}
+  ]'::jsonb,
   r2_config JSONB DEFAULT '{
     "accountId": "",
     "accessKeyId": "",
@@ -93,6 +100,9 @@ CREATE TABLE IF NOT EXISTS store_settings (
   }'::jsonb,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Хэрэв хүснэгт аль хэдийн үүссэн бол categories баганыг нэмэх
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS categories JSONB;
 
 -- Анхдагч тохиргооны мөр оруулах (Хэрэв байхгүй бол)
 INSERT INTO store_settings (id, admin_passcode)

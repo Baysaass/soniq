@@ -280,6 +280,11 @@ export const localDB = {
               ...STORE_SETTINGS,
               announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
               ...parsed,
+              categories: (Array.isArray(parsed.categories) && parsed.categories.length > 0)
+                ? parsed.categories
+                : (Array.isArray(parsed.bankInfo?.categories) && parsed.bankInfo.categories.length > 0)
+                  ? parsed.bankInfo.categories
+                  : DEFAULT_STORE_CATEGORIES,
               bankInfo: {
                 ...STORE_SETTINGS.bankInfo,
                 ...(parsed.bankInfo || {}),

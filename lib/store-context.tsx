@@ -110,6 +110,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             const next = {
               ...prev,
               ...data.settings,
+              categories: (Array.isArray(data.settings.categories) && data.settings.categories.length > 0)
+                ? data.settings.categories
+                : (Array.isArray(prev.categories) && prev.categories.length > 0 ? prev.categories : DEFAULT_STORE_CATEGORIES),
               bankInfo: {
                 ...prev.bankInfo,
                 ...(data.settings.bankInfo || {}),
