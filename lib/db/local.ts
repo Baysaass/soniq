@@ -275,6 +275,7 @@ export const localDB = {
         const content = fs.readFileSync(SETTINGS_FILE, 'utf-8').trim()
         if (content) {
           const parsed = JSON.parse(content)
+          if (parsed && typeof parsed === 'object') {
             const loaded: StoreSettingsType = {
               ...STORE_SETTINGS,
               announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
