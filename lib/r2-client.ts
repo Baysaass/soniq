@@ -143,7 +143,6 @@ export async function generatePresignedUploadUrl(params: {
   const command = new PutObjectCommand({
     Bucket: cfg.bucketName,
     Key: key,
-    ContentType: params.contentType || 'application/octet-stream',
   })
 
   const presignedUrl = await getSignedUrl(s3, command, {
