@@ -13,7 +13,7 @@ import {
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getStoreSettings, R2Config } from './settings-db'
 
-export function getEffectiveR2Config(): R2Config {
+export function getEffectiveR2Config(override?: Partial<R2Config>): R2Config {
   const settings = getStoreSettings()
   const cfg = settings.r2Config || {
     accountId: '',
@@ -24,22 +24,22 @@ export function getEffectiveR2Config(): R2Config {
   }
 
   return {
-    accountId: process.env.R2_ACCOUNT_ID || cfg.accountId || '',
-    accessKeyId: process.env.R2_ACCESS_KEY_ID || cfg.accessKeyId || '',
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || cfg.secretAccessKey || '',
-    bucketName: process.env.R2_BUCKET_NAME || cfg.bucketName || 'soniq-store',
-    publicDomain: process.env.R2_PUBLIC_DOMAIN || cfg.publicDomain || '',
+    accountId: override?.accountId?.trim() || process.env.R2_ACCOUNT_ID || cfg.accountId || '',
+    accessKeyId: override?.accessKeyId?.trim() || process.env.R2_ACCESS_KEY_ID || cfg.accessKeyId || '',
+    secretAccessKey: override?.secretAccessKey?.trim() || process.env.R2_SECRET_ACCESS_KEY || cfg.secretAccessKey || '',
+    bucketName: override?.bucketName?.trim() || process.env.R2_BUCKET_NAME || cfg.bucketName || 'soniq-store',
+    publicDomain: override?.publicDomain !== undefined ? override.publicDomain.trim() : (process.env.R2_PUBLIC_DOMAIN || cfg.publicDomain || ''),
   }
 }
 
-export function isR2Configured(): boolean {
-  const cfg = getEffectiveR2Config()
+export function isR2Configured(override?: Partial<R2Config>): boolean {
+  const cfg = getEffectiveR2Config(override)
   return Boolean(cfg.accountId && cfg.accessKeyId && cfg.secretAccessKey && cfg.bucketName)
 }
 
-export function getR2Client(): S3Client | null {
-  const cfg = getEffectiveR2Config()
-  if (!isR2Configured()) {
+export function getR2Client(override?: Partial<R2Config>): S3Client | null {
+  const cfg = getEffectiveR2Config(override)
+  if (!isR2Configured(override)) {
     return null
   }
 
@@ -56,16 +56,16 @@ export function getR2Client(): S3Client | null {
 /**
  * Tests connection to the Cloudflare R2 bucket
  */
-export async function testR2Connection(): Promise<{ success: boolean; message: string; bucketName?: string }> {
-  const cfg = getEffectiveR2Config()
-  if (!isR2Configured()) {
+export async function testR2Connection(override?: Partial<R2Config>): Promise<{ success: boolean; message: string; bucketName?: string }> {
+  const cfg = getEffectiveR2Config(override)
+  if (!isR2Configured(override)) {
     return {
       success: false,
-      message: 'Cloudflare R2 мэдээлэл дутуу байна (Account ID, Access Key, Secret Key шаардлагатай).',
+      message: 'Cloudflare R2 мэдээлэл дутуу байна (Account ID, Access Key ID, Secret Access Key, Bucket Name шаардлагатай).',
     }
   }
 
-  const s3 = getR2Client()
+  const s3 = getR2Client(override)
   if (!s3) {
     return { success: false, message: 'S3 Client үүсгэхэд алдаа гарлаа.' }
   }
@@ -82,10 +82,34 @@ export async function testR2Connection(): Promise<{ success: boolean; message: s
       bucketName: cfg.bucketName,
     }
   } catch (err: unknown) {
-    const error = err as Error
+    const error = err as any
+    const errCode = error?.name || error?.code || ''
+    const errMsg = error?.message || ''
+
+    if (errCode === 'NoSuchBucket' || errMsg.includes('specified bucket does not exist')) {
+      return {
+        success: false,
+        message: `R2 Bucket "${cfg.bucketName}" олдсонгүй! Cloudflare дээр үүсгэсэн Token-ий нэр биш, Bucket-ийн жинхэнэ нэрийг (жишээ нь: "soniq-store") оруулсан эсэхээ шалгана уу.`,
+      }
+    }
+
+    if (errCode === 'SignatureDoesNotMatch') {
+      return {
+        success: false,
+        message: 'R2 Secret Access Key тохирохгүй байна. Түлхүүрээ бүтнээр нь (64 тэмдэгт) зөв хуулсан эсэхээ шалгана уу.',
+      }
+    }
+
+    if (errCode === 'InvalidAccessKeyId') {
+      return {
+        success: false,
+        message: 'R2 Access Key ID буруу байна. Cloudflare дээрх Access Key ID-гаа шалгана уу.',
+      }
+    }
+
     return {
       success: false,
-      message: `R2 холболт амжилтгүй: ${error.message || 'Нэвтрэх эрх эсвэл bucket нэр буруу байна.'}`,
+      message: `R2 холболт амжилтгүй: ${errMsg || 'Нэвтрэх эрх эсвэл bucket нэр буруу байна.'}`,
     }
   }
 }

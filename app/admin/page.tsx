@@ -488,7 +488,11 @@ export default function AdminPage() {
     setTestingR2(true)
     setR2TestResult(null)
     try {
-      const res = await fetch('/api/r2/status')
+      const res = await fetch('/api/r2/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings.r2Config || {}),
+      })
       const data = await res.json()
       setR2TestResult({
         success: Boolean(data.success),
@@ -2049,9 +2053,12 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                    Custom Domain эсвэл Public R2 URL (Сонголттой)
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700">
+                      Custom Domain эсвэл Public R2 URL (Сонголттой)
+                    </label>
+                    <span className="text-[10px] text-zinc-400">Paid бүтээгдэхүүнд хоосон үлдээж болно</span>
+                  </div>
                   <input
                     type="text"
                     value={settings.r2Config?.publicDomain || ''}
@@ -2061,9 +2068,12 @@ export default function AdminPage() {
                         r2Config: { ...settings.r2Config, publicDomain: e.target.value },
                       })
                     }
-                    placeholder="https://files.soniq.click"
+                    placeholder="Жишээ: https://assets.soniq.click (S3 endpoint биш, эсвэл хоосон үлдээнэ)"
                     className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
                   />
+                  <p className="text-[10px] text-zinc-400 mt-1">
+                    💡 <b>Санамж:</b> Энд S3 endpoint-ийн URL бүү оруулаарай. Худалдан авсан хэрэглэгчийн таталт (SFX/Audio) нь Cloudflare-ийн нууц Presigned URL-аар автоматаар ажиллах тул энэ талбарыг хоосон үлдээж болно.
+                  </p>
                 </div>
 
                 <div className="pt-2 flex items-center justify-between gap-2 border-t border-zinc-200/80">

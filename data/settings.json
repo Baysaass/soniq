@@ -14,9 +14,9 @@
   "defaultBundleWeTransfer": "https://we.tl/t-soniq-ultimate-bundle-2026-vfx",
   "announcementText": "Бүх багц 85% хямдралтай · WeTransfer шууд таталт",
   "r2Config": {
-    "accountId": "",
-    "accessKeyId": "",
-    "secretAccessKey": "",
+    "accountId": "7f88a4551fd0f8b0d9d22fd6db314f23",
+    "accessKeyId": "944d0e8cc367b3ca63c1e9ed71dec3d5",
+    "secretAccessKey": "0c7b6b08966d207bc76393c1618d4f40485bcb985f06d9bbd5bb5d546fb3ff1d",
     "bucketName": "soniq-store",
     "publicDomain": ""
   }

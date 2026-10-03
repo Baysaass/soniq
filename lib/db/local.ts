@@ -275,8 +275,7 @@ export const localDB = {
         const content = fs.readFileSync(SETTINGS_FILE, 'utf-8').trim()
         if (content) {
           const parsed = JSON.parse(content)
-          if (parsed && typeof parsed === 'object') {
-            settingsCache = {
+            const loaded: StoreSettingsType = {
               ...STORE_SETTINGS,
               announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
               ...parsed,
@@ -292,7 +291,8 @@ export const localDB = {
                 publicDomain: process.env.R2_PUBLIC_DOMAIN || parsed.r2Config?.publicDomain || '',
               },
             }
-            return settingsCache
+            settingsCache = loaded
+            return loaded
           }
         }
       }
@@ -300,7 +300,7 @@ export const localDB = {
       console.error('Failed to read settings.json:', err)
     }
 
-    settingsCache = {
+    const defaultSettings: StoreSettingsType = {
       ...STORE_SETTINGS,
       announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
       r2Config: {
@@ -311,8 +311,9 @@ export const localDB = {
         publicDomain: process.env.R2_PUBLIC_DOMAIN || '',
       },
     }
+    settingsCache = defaultSettings
     this.saveSettings(settingsCache)
-    return settingsCache
+    return defaultSettings
   },
 
   saveSettings(updates: Partial<StoreSettingsType>): boolean {
@@ -326,8 +327,11 @@ export const localDB = {
         ...(updates.bankInfo || {}),
       },
       r2Config: {
-        ...current.r2Config,
-        ...(updates.r2Config || {}),
+        accountId: updates.r2Config?.accountId ?? current.r2Config?.accountId ?? '',
+        accessKeyId: updates.r2Config?.accessKeyId ?? current.r2Config?.accessKeyId ?? '',
+        secretAccessKey: updates.r2Config?.secretAccessKey ?? current.r2Config?.secretAccessKey ?? '',
+        bucketName: updates.r2Config?.bucketName ?? current.r2Config?.bucketName ?? 'soniq-store',
+        publicDomain: updates.r2Config?.publicDomain ?? current.r2Config?.publicDomain ?? '',
       },
     }
     try {
