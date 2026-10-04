@@ -136,3 +136,38 @@ export const FAQS = [
     a: 'Та манай Instagram (@_baysaa_notfound) эсвэл Telegram хаяг руу өөрийн захиалгын кодоо (SQ-XXXXX) илгээснээр түргэн шуурхай тусламж авах боломжтой.',
   },
 ]
+
+/**
+ * Resolves any image URL to ensure it loads cleanly in all browsers.
+ * - Converts raw Cloudflare R2 endpoints (*.r2.cloudflarestorage.com) to /api/r2/image?key=...
+ * - Converts raw R2 keys (images/products/...) to /api/r2/image?key=...
+ * - Handles empty or invalid fallbacks cleanly
+ */
+export function resolveProductImageUrl(url?: string): string {
+  if (!url || typeof url !== 'string') return '/images/product-morph-3d.png'
+  const trimmed = url.trim()
+  if (!trimmed) return '/images/product-morph-3d.png'
+
+  // If already an R2 image proxy URL or data URL or valid public HTTP URL, return as is
+  if (trimmed.startsWith('/api/r2/image') || trimmed.startsWith('data:image/')) {
+    return trimmed
+  }
+
+  // If it's an R2 direct endpoint URL (*.r2.cloudflarestorage.com), route through our proxy
+  if (trimmed.includes('r2.cloudflarestorage.com')) {
+    try {
+      const u = new URL(trimmed)
+      const key = u.pathname.replace(/^\/+/, '')
+      return `/api/r2/image?key=${encodeURIComponent(key)}`
+    } catch {
+      return trimmed
+    }
+  }
+
+  // If it's an R2 object key directly
+  if (trimmed.startsWith('images/products/') || trimmed.startsWith('products/')) {
+    return `/api/r2/image?key=${encodeURIComponent(trimmed)}`
+  }
+
+  return trimmed
+}

@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import type { StoreProduct, Order, StoreSettingsType } from './types'
-import { DEFAULT_STORE_CATEGORIES } from '../store-data'
+import { DEFAULT_STORE_CATEGORIES, resolveProductImageUrl } from '../store-data'
 
 function getSupabaseCredentials() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -39,19 +39,19 @@ export function getSupabaseClient(): SupabaseClient | null {
 function mapProductRow(row: any): StoreProduct {
   let images: string[] = []
   if (Array.isArray(row.images)) {
-    images = row.images.filter(Boolean)
+    images = row.images.filter(Boolean).map(resolveProductImageUrl)
   } else if (typeof row.image === 'string' && row.image.includes('|||')) {
-    images = row.image.split('|||').map((s: string) => s.trim()).filter(Boolean)
+    images = row.image.split('|||').map((s: string) => s.trim()).filter(Boolean).map(resolveProductImageUrl)
   } else if (typeof row.image === 'string' && row.image.startsWith('[') && row.image.endsWith(']')) {
     try {
       const parsed = JSON.parse(row.image)
-      if (Array.isArray(parsed)) images = parsed.filter(Boolean)
+      if (Array.isArray(parsed)) images = parsed.filter(Boolean).map(resolveProductImageUrl)
     } catch {}
   } else if (row.image) {
-    images = [row.image]
+    images = [resolveProductImageUrl(row.image)]
   }
 
-  const primaryImage = images[0] || row.image || '/images/product-morph-3d.png'
+  const primaryImage = images[0] || resolveProductImageUrl(row.image) || '/images/product-morph-3d.png'
 
   return {
     id: row.id,

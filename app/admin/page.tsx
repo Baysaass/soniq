@@ -54,6 +54,7 @@ import { SoniqMark, SoniqWordmark } from '@/components/logo'
 import { R2FileUploader } from '@/components/admin/r2-file-uploader'
 import { convertImageFileToWebP } from '@/lib/image-utils'
 import { renderCollageGrid } from '@/components/store/store-product-collage'
+import { SafeProductImage } from '@/components/store/safe-image'
 import {
   FileFormatSelector,
   FileFormatBadgeList,
@@ -125,7 +126,18 @@ export default function AdminPage() {
   const [showR2InModal, setShowR2InModal] = useState(false)
 
   // Orders State
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<Order[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('soniq_orders_cache')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        }
+      } catch {}
+    }
+    return []
+  })
   const [ordersLoading, setOrdersLoading] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [weTransferInput, setWeTransferInput] = useState('')
@@ -405,13 +417,26 @@ export default function AdminPage() {
   }
 
   // Fetch Orders
-  const fetchOrders = async (code: string) => {
-    setOrdersLoading(true)
+  const fetchOrders = async (code?: string, forceFresh = false) => {
+    const activeCode = code || passcode || (typeof window !== 'undefined' ? sessionStorage.getItem('soniq_admin_passcode') : '') || ''
+    if (!activeCode) return
+    if (orders.length === 0) {
+      setOrdersLoading(true)
+    }
     try {
-      const res = await fetch(`/api/orders?passcode=${encodeURIComponent(code)}`)
+      const url = `/api/orders?passcode=${encodeURIComponent(activeCode)}${forceFresh ? '&fresh=true' : ''}`
+      const res = await fetch(url, {
+        headers: {
+          'x-admin-passcode': activeCode,
+        },
+      })
       if (res.ok) {
         const data = await res.json()
-        setOrders(data.orders || [])
+        const fetchedOrders = data.orders || []
+        setOrders(fetchedOrders)
+        try {
+          localStorage.setItem('soniq_orders_cache', JSON.stringify(fetchedOrders))
+        } catch {}
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err)
@@ -546,8 +571,8 @@ export default function AdminPage() {
       originalPriceMNT: 89000,
       priceUSD: 9.99,
       originalPriceUSD: 29.0,
-      image: '/images/product-morph-3d.png',
-      images: ['/images/product-morph-3d.png'],
+      image: '',
+      images: [],
       fileSize: '',
       format: '',
       fileFormats: [],
@@ -592,9 +617,10 @@ export default function AdminPage() {
     const files = e.target.files
     if (!files || files.length === 0) return
 
-    const currentImages = Array.isArray(editingProduct?.images) && editingProduct.images.length > 0
+    const currentImages = (Array.isArray(editingProduct?.images) && editingProduct.images.length > 0
       ? [...editingProduct.images]
       : (editingProduct?.image ? [editingProduct.image] : [])
+    ).filter((img) => img && img !== '/images/product-morph-3d.png')
 
     if (currentImages.length >= 6) {
       alert('Нэг бүтээгдэхүүнд дээд тал нь 6 зураг оруулах боломжтой.')
@@ -651,7 +677,7 @@ export default function AdminPage() {
         if (!prev) return prev
         return {
           ...prev,
-          image: mergedImages[0] || prev.image || '/images/product-morph-3d.png',
+          image: mergedImages[0] || '',
           images: mergedImages,
         }
       })
@@ -725,9 +751,16 @@ export default function AdminPage() {
       const url = isEdit ? `/api/products/${targetId}` : '/api/products'
       const method = isEdit ? 'PUT' : 'POST'
 
-      const currentImgs = Array.isArray(editingProduct.images) && editingProduct.images.length > 0
+      let currentImgs = (Array.isArray(editingProduct.images) && editingProduct.images.length > 0
         ? editingProduct.images.slice(0, 6)
-        : (editingProduct.image ? [editingProduct.image] : ['/images/product-morph-3d.png'])
+        : (editingProduct.image ? [editingProduct.image] : [])
+      ).filter(Boolean)
+      if (currentImgs.length > 1) {
+        currentImgs = currentImgs.filter((img) => img !== '/images/product-morph-3d.png')
+      }
+      if (currentImgs.length === 0) {
+        currentImgs = ['/images/product-morph-3d.png']
+      }
 
       const cleanFeatures = (Array.isArray(editingProduct.features) ? editingProduct.features : [])
         .map((f) => (typeof f === 'string' ? f.trim() : ''))
@@ -1123,7 +1156,10 @@ export default function AdminPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('orders')}
+              onClick={() => {
+                setActiveTab('orders')
+                fetchOrders(passcode)
+              }}
               className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'orders'
                   ? 'bg-white text-[#141414] shadow-xs'
@@ -3095,7 +3131,7 @@ export default function AdminPage() {
                           }`}
                         >
                           <div className="relative aspect-square w-full bg-zinc-100">
-                            <Image
+                            <SafeProductImage
                               src={imgUrl}
                               alt={`Зураг ${idx + 1}`}
                               fill

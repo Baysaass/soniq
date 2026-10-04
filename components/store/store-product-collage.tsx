@@ -11,6 +11,7 @@ import {
   Sparkles,
   Layers,
 } from 'lucide-react'
+import { resolveProductImageUrl } from '@/lib/store-data'
 
 interface StoreProductCollageProps {
   images?: string[]
@@ -31,8 +32,8 @@ export function StoreProductCollage({
 }: StoreProductCollageProps) {
   // Normalize images list (maximum 6)
   const allImages = Array.isArray(images) && images.length > 0
-    ? Array.from(new Set(images.filter(Boolean))).slice(0, 6)
-    : [primaryImage || '/images/product-morph-3d.png']
+    ? Array.from(new Set(images.filter(Boolean).map(resolveProductImageUrl))).slice(0, 6)
+    : [resolveProductImageUrl(primaryImage) || '/images/product-morph-3d.png']
 
   const [activeIndex, setActiveIndex] = useState(0)
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)

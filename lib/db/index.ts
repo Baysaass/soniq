@@ -21,6 +21,13 @@ export function invalidateProductsCache() {
   inMemoryProductsCache = null
 }
 
+let inMemoryOrdersCache: { data: Order[]; timestamp: number } | null = null
+const ORDERS_CACHE_TTL_MS = 10_000 // 10 seconds high-speed memory cache for orders
+
+export function invalidateOrdersCache() {
+  inMemoryOrdersCache = null
+}
+
 /**
  * Unified Database Interface
  * Automatically switches between Supabase, PostgreSQL, or Local storage based on environment variables.
@@ -185,23 +192,33 @@ export const db = {
     return localDB.deleteProduct(id)
   },
 
-  async getOrders(): Promise<Order[]> {
+  async getOrders(forceFresh = false): Promise<Order[]> {
+    const now = Date.now()
+    if (!forceFresh && inMemoryOrdersCache && (now - inMemoryOrdersCache.timestamp < ORDERS_CACHE_TTL_MS)) {
+      return inMemoryOrdersCache.data
+    }
+
     const provider = getActiveDBProvider()
+    let orders: Order[] = []
+
     if (provider === 'supabase') {
       try {
-        return await supabaseDB.getOrders()
+        orders = await supabaseDB.getOrders()
       } catch (err) {
-        return localDB.getOrders()
+        orders = localDB.getOrders()
       }
-    }
-    if (provider === 'postgres') {
+    } else if (provider === 'postgres') {
       try {
-        return await postgresDB.getOrders()
+        orders = await postgresDB.getOrders()
       } catch (err) {
-        return localDB.getOrders()
+        orders = localDB.getOrders()
       }
+    } else {
+      orders = localDB.getOrders()
     }
-    return localDB.getOrders()
+
+    inMemoryOrdersCache = { data: orders, timestamp: now }
+    return orders
   },
 
   async getOrderById(id: string): Promise<Order | null> {
@@ -224,6 +241,7 @@ export const db = {
   },
 
   async createOrder(data: Partial<Order>): Promise<Order> {
+    invalidateOrdersCache()
     const orderId = data.id || `SQ-${Math.floor(10000 + Math.random() * 90000)}`
     const orderData: Partial<Order> = {
       ...data,
@@ -261,6 +279,7 @@ export const db = {
     adminNotes?: string,
     r2Key?: string
   ): Promise<Order | null> {
+    invalidateOrdersCache()
     const updates: Partial<Order> = {
       status: 'APPROVED',
       approvedAt: new Date().toISOString(),
@@ -294,6 +313,7 @@ export const db = {
   },
 
   async cancelOrder(id: string, reason?: string): Promise<Order | null> {
+    invalidateOrdersCache()
     const updates: Partial<Order> = {
       status: 'CANCELLED',
       adminNotes: reason || 'Захиалга админаар цуцлагдсан',

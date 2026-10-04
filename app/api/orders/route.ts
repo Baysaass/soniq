@@ -102,13 +102,21 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const passcode = searchParams.get('passcode')
+  const passcode = searchParams.get('passcode') || request.headers.get('x-admin-passcode') || ''
 
-  const isAuthorized = await db.verifyAdminPasscode(passcode || '')
+  const isAuthorized = await db.verifyAdminPasscode(passcode)
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const orders = await db.getOrders()
-  return NextResponse.json({ orders })
+  const forceFresh = searchParams.get('fresh') === 'true'
+  const orders = await db.getOrders(forceFresh)
+  return NextResponse.json(
+    { orders },
+    {
+      headers: {
+        'Cache-Control': 'private, max-age=5, stale-while-revalidate=30',
+      },
+    }
+  )
 }

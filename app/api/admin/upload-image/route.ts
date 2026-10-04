@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
           const domain = r2Cfg.publicDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '')
           publicUrl = `https://${domain}/${objectKey}`
         } else {
-          publicUrl = `https://${r2Cfg.bucketName}.${r2Cfg.accountId}.r2.cloudflarestorage.com/${objectKey}`
+          publicUrl = `/api/r2/image?key=${encodeURIComponent(objectKey)}`
         }
 
         return NextResponse.json({
@@ -133,33 +133,37 @@ export async function POST(req: NextRequest) {
       console.warn('Supabase storage upload skipped or failed:', sbStorageErr)
     }
 
-    // 3. Try writing to public/uploads directory (works locally / standalone servers)
-    try {
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true })
-      }
-      const filePath = path.join(uploadsDir, filename)
-      fs.writeFileSync(filePath, buffer)
+    // 3. In local development environment, write to public/uploads directory
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const uploadsDir = path.join(process.cwd(), 'public', 'uploads')
+        if (!fs.existsSync(uploadsDir)) {
+          fs.mkdirSync(uploadsDir, { recursive: true })
+        }
+        const filePath = path.join(uploadsDir, filename)
+        fs.writeFileSync(filePath, buffer)
 
-      return NextResponse.json({
-        success: true,
-        url: `/uploads/${filename}`,
-        filename,
-        storage: 'local',
-        sizeBytes: buffer.length,
-      })
-    } catch (fsErr) {
-      // 4. In serverless / read-only filesystem environments without R2 or Supabase storage, return optimized DataURL
-      const returnDataUrl = dataUrl || `data:image/webp;base64,${buffer.toString('base64')}`
-      return NextResponse.json({
-        success: true,
-        url: returnDataUrl,
-        filename,
-        storage: 'data-url',
-        sizeBytes: buffer.length,
-      })
+        return NextResponse.json({
+          success: true,
+          url: `/uploads/${filename}`,
+          filename,
+          storage: 'local',
+          sizeBytes: buffer.length,
+        })
+      } catch (fsErr) {
+        // Fall back to data URL
+      }
     }
+
+    // 4. In serverless / read-only filesystem environments, return optimized WebP DataURL
+    const returnDataUrl = dataUrl || `data:image/webp;base64,${buffer.toString('base64')}`
+    return NextResponse.json({
+      success: true,
+      url: returnDataUrl,
+      filename,
+      storage: 'data-url',
+      sizeBytes: buffer.length,
+    })
   } catch (err: any) {
     console.error('Image upload error:', err)
     return NextResponse.json(

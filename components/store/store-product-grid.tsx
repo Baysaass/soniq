@@ -15,6 +15,7 @@ import {
 import { STORE_PRODUCTS, DEFAULT_STORE_CATEGORIES, StoreCategory } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
 import { FileFormatBadgeList } from '@/components/store/file-format-badge'
+import { SafeProductImage } from '@/components/store/safe-image'
 
 export function StoreProductGrid() {
   const {
@@ -177,12 +178,68 @@ export function StoreProductGrid() {
                   {/* Product Artwork */}
                   <div className="relative aspect-[16/10] rounded-lg overflow-hidden bg-zinc-100 mb-2.5 border border-zinc-100">
                     <Link href={`/shop/product/${product.slug}`} className="block w-full h-full">
-                      <Image
-                        src={product.image}
-                        alt={product.title}
-                        fill
-                        className="object-cover group-hover:scale-102 transition-transform duration-300"
-                      />
+                      {Array.isArray(product.images) && product.images.length === 2 ? (
+                        <div className="grid grid-cols-2 gap-0.5 w-full h-full">
+                          <div className="relative w-full h-full overflow-hidden bg-zinc-100">
+                            <SafeProductImage
+                              src={product.images[0]}
+                              alt={`${product.title} - 1`}
+                              fill
+                              sizes="(max-width: 640px) 50vw, 25vw"
+                              className="object-cover group-hover:scale-104 transition-transform duration-300"
+                            />
+                          </div>
+                          <div className="relative w-full h-full overflow-hidden bg-zinc-100">
+                            <SafeProductImage
+                              src={product.images[1]}
+                              alt={`${product.title} - 2`}
+                              fill
+                              sizes="(max-width: 640px) 50vw, 25vw"
+                              className="object-cover group-hover:scale-104 transition-transform duration-300"
+                            />
+                          </div>
+                        </div>
+                      ) : Array.isArray(product.images) && product.images.length >= 3 ? (
+                        <div className="grid grid-cols-5 gap-0.5 w-full h-full">
+                          <div className="col-span-3 relative w-full h-full overflow-hidden bg-zinc-100">
+                            <SafeProductImage
+                              src={product.images[0]}
+                              alt={`${product.title} - 1`}
+                              fill
+                              sizes="(max-width: 640px) 50vw, 25vw"
+                              className="object-cover group-hover:scale-104 transition-transform duration-300"
+                            />
+                          </div>
+                          <div className="col-span-2 grid grid-rows-2 gap-0.5 h-full">
+                            <div className="relative w-full h-full overflow-hidden bg-zinc-100">
+                              <SafeProductImage
+                                src={product.images[1]}
+                                alt={`${product.title} - 2`}
+                                fill
+                                sizes="(max-width: 640px) 25vw, 15vw"
+                                className="object-cover group-hover:scale-104 transition-transform duration-300"
+                              />
+                            </div>
+                            <div className="relative w-full h-full overflow-hidden bg-zinc-100">
+                              <SafeProductImage
+                                src={product.images[2]}
+                                alt={`${product.title} - 3`}
+                                fill
+                                sizes="(max-width: 640px) 25vw, 15vw"
+                                className="object-cover group-hover:scale-104 transition-transform duration-300"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <SafeProductImage
+                          src={product.image || (product.images && product.images[0])}
+                          alt={product.title}
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                          className="object-cover group-hover:scale-102 transition-transform duration-300"
+                        />
+                      )}
                     </Link>
 
                     <div className="absolute top-2 left-2 flex items-center gap-1 flex-wrap">
