@@ -201,10 +201,13 @@ export function StoreCheckoutModal() {
 
       // For free downloads: show instant download screen directly in the modal!
       if (isFree) {
+        const resolvedDrive = (data.weTransferLink ?? data.order?.weTransferLink ?? '')?.trim()
+        const resolvedR2 = (data.r2Key ?? data.order?.r2Key ?? '')?.trim()
+
         setClaimedOrder({
           id: data.orderId,
-          weTransferLink: data.downloadUrl || data.order?.weTransferLink || itemsToBuy[0]?.weTransferLink,
-          r2Key: data.r2Key || data.order?.r2Key || itemsToBuy[0]?.r2Key,
+          weTransferLink: resolvedDrive || undefined,
+          r2Key: resolvedR2 || undefined,
           customerEmail: email.trim(),
         })
         setIsSubmitting(false)
@@ -288,6 +291,7 @@ export function StoreCheckoutModal() {
 
             {/* Action Buttons: Instant Downloads */}
             <div className="space-y-2.5 pt-2">
+              {/* Option 1: Google Drive / Direct Link */}
               {claimedOrder.weTransferLink && (
                 <div className="space-y-1.5">
                   <a
@@ -297,7 +301,11 @@ export function StoreCheckoutModal() {
                     className="w-full py-3.5 px-5 rounded-full bg-[#141414] hover:bg-black text-white font-bold text-xs uppercase tracking-wide transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 group"
                   >
                     <Download className="w-4 h-4 text-[#00B0FF] group-hover:translate-y-0.5 transition-transform" />
-                    <span>Google Drive / Холбоосоор шууд татах</span>
+                    <span>
+                      {claimedOrder.weTransferLink.includes('drive.google.com')
+                        ? 'Google Drive-аар шууд татах'
+                        : 'Шууд холбоосоор татаж авах'}
+                    </span>
                     <ExternalLink className="w-3.5 h-3.5 opacity-70" />
                   </a>
 
@@ -321,27 +329,58 @@ export function StoreCheckoutModal() {
                 </div>
               )}
 
+              {/* Option 2: Cloudflare R2 */}
               {claimedOrder.r2Key && (
-                <div className="pt-1">
+                <div className="space-y-1.5">
                   <button
                     type="button"
                     onClick={handleDownloadR2}
                     disabled={generatingR2}
-                    className="w-full py-3 px-5 rounded-full bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#0088CC] font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    className={`w-full py-3.5 px-5 rounded-full font-bold text-xs uppercase tracking-wide transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 ${
+                      claimedOrder.weTransferLink
+                        ? 'bg-purple-50 hover:bg-purple-100 border border-purple-200 text-purple-700'
+                        : 'bg-[#141414] hover:bg-black text-white'
+                    }`}
                   >
                     {generatingR2 ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin text-[#00B0FF]" />
                         <span>R2 холбоос үүсгэж байна...</span>
                       </>
                     ) : (
                       <>
-                        <Cloud className="w-4 h-4" />
-                        <span>Cloudflare R2-оор татах</span>
+                        <Cloud className="w-4 h-4 text-[#00B0FF]" />
+                        <span>Cloudflare R2-оор шууд татах (Өндөр хурд)</span>
                         <Download className="w-3.5 h-3.5 ml-1" />
                       </>
                     )}
                   </button>
+
+                  {r2DownloadUrl && (
+                    <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
+                      <span className="font-mono text-[10px] truncate max-w-[240px] text-zinc-500">
+                        {r2DownloadUrl}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink(r2DownloadUrl)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E6E6E3] text-zinc-700 font-semibold text-[10px] hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
+                      >
+                        {copiedDownloadLink ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>Хуулагдлаа</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Линк хуулах</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+
                   {r2Error && (
                     <p className="text-[11px] text-red-600 mt-1">{r2Error}</p>
                   )}

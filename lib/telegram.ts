@@ -188,6 +188,7 @@ export function formatOrderNotificationText(order: Order, siteUrl: string = 'htt
 📧 <b>Gmail / И-мэйл:</b> <code>${escapeHtml(order.customerEmail)}</code>
 ${order.customerPhone && order.customerPhone !== 'Үнэгүй таталт' ? `📞 <b>Утас:</b> <code>${escapeHtml(order.customerPhone)}</code>\n` : ''}
 💰 <b>Төлбөр:</b> <b>ҮНЭГҮЙ (0₮)</b>
+📥 <b>Татах суваг:</b> ${order.r2Key && order.weTransferLink ? 'Cloudflare R2 + Google Drive' : order.r2Key ? '☁️ Cloudflare R2' : '📁 Google Drive / Линк'}
 🔓 <b>Татах эрх:</b> Шууд баталгаажсан (Идэвхтэй ✓)
 🛒 <b>Татаж авсан бүтээгдэхүүн:</b>
 ${itemsText || '  • Үнэгүй багц'}
@@ -251,6 +252,7 @@ export function formatOrderApprovedNotificationText(
 📞 <b>Утас:</b> <code>${escapeHtml(order.customerPhone || 'Утасгүй')}</code>
 📧 <b>Gmail (Drive):</b> <code>${escapeHtml(order.customerEmail)}</code>
 💰 <b>Төлбөр:</b> <b>${totalFormatted}</b> (${escapeHtml(order.paymentMethod || 'Хаан Банк')})
+📥 <b>Татах суваг:</b> ${order.r2Key && order.weTransferLink ? 'Cloudflare R2 + Google Drive' : order.r2Key ? '☁️ Cloudflare R2' : '📁 Google Drive / Линк'}
 
 🚀 <b>И-мэйл хүргэлт:</b> ${emailStatusText}
 🔓 <b>Татах эрх:</b> Нээгдсэн (Идэвхтэй ✓)

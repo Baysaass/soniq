@@ -64,7 +64,9 @@ export async function POST(request: Request) {
       }
     }
 
-    if (!orderWeTransferLink) {
+    // IMPORTANT: Only fall back to settings.defaultBundleWeTransfer if NEITHER weTransferLink NOR r2Key is present
+    // If a product was configured with R2 only, we MUST NOT inject the bundle's Google Drive link
+    if (!orderWeTransferLink && !orderR2Key) {
       try {
         const settings = await db.getSettings()
         orderWeTransferLink = settings?.defaultBundleWeTransfer || ''
@@ -123,8 +125,9 @@ export async function POST(request: Request) {
       orderId: order.id,
       order,
       isFree,
-      downloadUrl: orderWeTransferLink,
-      r2Key: orderR2Key,
+      downloadUrl: orderWeTransferLink || '',
+      weTransferLink: orderWeTransferLink || '',
+      r2Key: orderR2Key || '',
     })
   } catch (error: any) {
     console.error('Error creating order:', error)

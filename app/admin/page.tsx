@@ -125,6 +125,7 @@ export default function AdminPage() {
   const [uploadingProductImages, setUploadingProductImages] = useState(false)
   const [uploadProgressText, setUploadProgressText] = useState('')
   const [showR2InModal, setShowR2InModal] = useState(false)
+  const [deliveryTypeInModal, setDeliveryTypeInModal] = useState<'drive' | 'r2' | 'both'>('drive')
 
   // Orders State
   const [orders, setOrders] = useState<Order[]>(() => {
@@ -586,12 +587,24 @@ export default function AdminPage() {
       r2Key: '',
       notice: '',
     })
+    setDeliveryTypeInModal('drive')
     setProductModalError('')
     setIsProductModalOpen(true)
   }
 
   const openEditProductModal = (prod: StoreProduct) => {
-    setShowR2InModal(Boolean(prod.r2Key))
+    const hasR2 = Boolean(prod.r2Key && prod.r2Key.trim().length > 0)
+    const hasDrive = Boolean(prod.defaultWeTransferLink && prod.defaultWeTransferLink.trim().length > 0)
+    if (hasR2 && hasDrive) {
+      setDeliveryTypeInModal('both')
+      setShowR2InModal(true)
+    } else if (hasR2) {
+      setDeliveryTypeInModal('r2')
+      setShowR2InModal(true)
+    } else {
+      setDeliveryTypeInModal('drive')
+      setShowR2InModal(false)
+    }
     const currentImgs = Array.isArray(prod.images) && prod.images.length > 0
       ? prod.images.filter(Boolean)
       : (prod.image ? [prod.image] : ['/images/product-morph-3d.png'])
@@ -809,6 +822,31 @@ export default function AdminPage() {
         (Number(editingProduct.priceMNT || 0) === 0 && Number(editingProduct.priceUSD || 0) === 0)
       )
 
+      let finalWeTransferLink = (editingProduct.defaultWeTransferLink || '').trim()
+      let finalR2Key = (editingProduct.r2Key || '').trim()
+
+      if (deliveryTypeInModal === 'drive') {
+        finalR2Key = ''
+        if (!finalWeTransferLink) {
+          setProductModalError('Google Drive / Татах холбоосоо оруулна уу.')
+          setSavingProduct(false)
+          return
+        }
+      } else if (deliveryTypeInModal === 'r2') {
+        finalWeTransferLink = ''
+        if (!finalR2Key) {
+          setProductModalError('Cloudflare R2 дээр файл байршуулах эсвэл R2 түлхүүрээ оруулна уу.')
+          setSavingProduct(false)
+          return
+        }
+      } else {
+        if (!finalWeTransferLink && !finalR2Key) {
+          setProductModalError('Google Drive холбоос эсвэл R2 түлхүүрийн аль нэгийг заавал оруулна уу.')
+          setSavingProduct(false)
+          return
+        }
+      }
+
       const payload = {
         ...editingProduct,
         title: (editingProduct.title || '').trim(),
@@ -818,6 +856,8 @@ export default function AdminPage() {
         originalPriceMNT: Math.round(Number(editingProduct.originalPriceMNT) || 0),
         priceUSD: isFree ? 0 : (Number(editingProduct.priceUSD) || 0),
         originalPriceUSD: Number(editingProduct.originalPriceUSD) || 0,
+        defaultWeTransferLink: finalWeTransferLink,
+        r2Key: finalR2Key,
         image: currentImgs[0] || '/images/product-morph-3d.png',
         images: currentImgs,
         features: cleanFeatures.length > 0 ? cleanFeatures : ['Өндөр чанарын бүтээгдэхүүн', '100% Royalty Free лиценз'],
@@ -1506,10 +1546,20 @@ export default function AdminPage() {
                           </td>
 
                           <td className="py-3 px-3">
-                            {p.r2Key ? (
+                            {p.r2Key && p.defaultWeTransferLink ? (
                               <div className="space-y-1">
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                                  <Cloud className="w-2.5 h-2.5 text-[#0088CC]" />
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                                  <span>R2 + Drive</span>
+                                </span>
+                                <div className="text-[10px] text-zinc-500 font-mono truncate max-w-[130px]" title={`R2: ${p.r2Key} | Drive: ${p.defaultWeTransferLink}`}>
+                                  {p.r2Key}
+                                </div>
+                              </div>
+                            ) : p.r2Key ? (
+                              <div className="space-y-1">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                                  <Cloud className="w-2.5 h-2.5 text-purple-600" />
                                   <span>R2 Cloud</span>
                                 </span>
                                 <div className="text-[10px] text-zinc-500 font-mono truncate max-w-[130px]" title={p.r2Key}>
@@ -3047,65 +3097,118 @@ export default function AdminPage() {
                 }
               />
 
-              {/* Google Drive / Download Link - PRIMARY & DEFAULT */}
-              <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200/90 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-[11px] font-bold text-blue-950 flex items-center gap-1.5">
-                    <ExternalLink className="w-3.5 h-3.5 text-[#0088CC]" />
-                    <span>Google Drive / Татах холбоос (Үндсэн хандалт) *</span>
-                  </label>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
-                    Үндсэн татах арга
-                  </span>
+              {/* Delivery Channel Selector (Google Drive vs Cloudflare R2 vs Both) */}
+              <div className="space-y-3">
+                <div className="p-3 bg-zinc-50 rounded-xl border border-zinc-200/80">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-[11px] font-bold text-zinc-800 flex items-center gap-1.5">
+                      <span>Файл татах суваг (Татах арга) *</span>
+                    </label>
+                    <span className="text-[10px] text-zinc-500 font-medium">
+                      {deliveryTypeInModal === 'drive'
+                        ? '📁 Зөвхөн Google Drive / Линк харагдана'
+                        : deliveryTypeInModal === 'r2'
+                        ? '☁️ Зөвхөн Cloudflare R2 товч харагдана'
+                        : '🔗 R2 болон Drive 2-уулаа харагдана'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5 p-1 bg-zinc-200/70 rounded-xl text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeliveryTypeInModal('drive')
+                        setShowR2InModal(false)
+                      }}
+                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                        deliveryTypeInModal === 'drive'
+                          ? 'bg-white text-[#0088CC] shadow-xs font-bold border border-zinc-200'
+                          : 'text-zinc-600 hover:text-black hover:bg-white/50'
+                      }`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Google Drive / Линк</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeliveryTypeInModal('r2')
+                        setShowR2InModal(true)
+                      }}
+                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                        deliveryTypeInModal === 'r2'
+                          ? 'bg-white text-purple-600 shadow-xs font-bold border border-zinc-200'
+                          : 'text-zinc-600 hover:text-black hover:bg-white/50'
+                      }`}
+                    >
+                      <Cloud className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Cloudflare R2</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeliveryTypeInModal('both')
+                        setShowR2InModal(true)
+                      }}
+                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
+                        deliveryTypeInModal === 'both'
+                          ? 'bg-white text-emerald-600 shadow-xs font-bold border border-zinc-200'
+                          : 'text-zinc-600 hover:text-black hover:bg-white/50'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                      <span className="truncate">Хоёулаа (R2+Drive)</span>
+                    </button>
+                  </div>
                 </div>
-                <input
-                  type="url"
-                  required
-                  value={editingProduct.defaultWeTransferLink || ''}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, defaultWeTransferLink: e.target.value })}
-                  placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
-                />
-                <p className="text-[11px] text-blue-900/80 leading-relaxed">
-                  💡 <strong>Google Drive:</strong> Та зарах файлаа Google Drive-т хуулаад, тухайн хавтас эсвэл .zip файлынхаа &quot;Share&quot; линкийг энд тавина уу. Захиалагч төлбөрөө төлөхөд энэхүү холбоос очно.
-                </p>
-              </div>
 
-              {/* Cloudflare R2 - OPTIONAL COLLAPSIBLE */}
-              <div className="rounded-xl border border-[#E6E6E3] overflow-hidden bg-[#FAFAFA]">
-                <button
-                  type="button"
-                  onClick={() => setShowR2InModal(!showR2InModal)}
-                  className="w-full p-3 flex items-center justify-between text-left hover:bg-zinc-100/70 transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Cloud className="w-4 h-4 text-[#0088CC]" />
-                    <span className="text-[11px] font-bold text-zinc-800">
-                      Cloudflare R2 сан холбох
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-normal">
-                      (Сонголттой / 1GB–10GB+ хэмжээтэй файл байршуулах үед л ашиглана)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {editingProduct.r2Key ? (
-                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                        <Check className="w-2.5 h-2.5" />
-                        <span>R2 холбогдсон</span>
+                {/* 1. Google Drive Input */}
+                {(deliveryTypeInModal === 'drive' || deliveryTypeInModal === 'both') && (
+                  <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200/90 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-bold text-blue-950 flex items-center gap-1.5">
+                        <ExternalLink className="w-3.5 h-3.5 text-[#0088CC]" />
+                        <span>Google Drive / Татах холбоос {deliveryTypeInModal === 'drive' ? '*' : '(Нөөц холбоос)'}</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-blue-700 bg-blue-100/90 px-2 py-0.5 rounded border border-blue-300">
+                        {deliveryTypeInModal === 'both' ? 'Нөөц татах холбоос' : 'Зөвхөн энэ линк харагдана'}
                       </span>
-                    ) : (
-                      <span className="text-[10px] text-zinc-500 font-semibold">
-                        {showR2InModal ? 'Хаах ▲' : 'Нээх ▼'}
-                      </span>
-                    )}
-                  </div>
-                </button>
-
-                {showR2InModal && (
-                  <div className="p-3.5 pt-0 border-t border-[#E6E6E3] space-y-3 mt-2">
-                    <p className="text-[10px] text-zinc-500">
-                      ⚠️ Хэрэв та дээр Google Drive холбоос оруулсан бол R2-ийг тохируулах шаардлагагүй (хоосон үлдээнэ үү).
+                    </div>
+                    <input
+                      type="url"
+                      value={editingProduct.defaultWeTransferLink || ''}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, defaultWeTransferLink: e.target.value })}
+                      placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
+                      className="w-full px-3 py-2 rounded-lg bg-white border border-blue-200 font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#0088CC]"
+                    />
+                    <p className="text-[11px] text-blue-900/80 leading-relaxed">
+                      💡 <strong>Google Drive:</strong> Зарах файлынхаа Google Drive / WeTransfer линкийг энд оруулна. Хэрэглэгчид <strong>зөвхөн Google Drive товч</strong> харагдаж татна.
                     </p>
+                  </div>
+                )}
+
+                {/* 2. Cloudflare R2 Uploader */}
+                {(deliveryTypeInModal === 'r2' || deliveryTypeInModal === 'both') && (
+                  <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-200/90 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-bold text-purple-950 flex items-center gap-1.5">
+                        <Cloud className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Cloudflare R2 файл сан {deliveryTypeInModal === 'r2' ? '*' : '(Үндсэн сан)'}</span>
+                      </label>
+                      {editingProduct.r2Key ? (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 flex items-center gap-1">
+                          <Check className="w-2.5 h-2.5" />
+                          <span>R2 файл холбогдсон</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-purple-700 bg-purple-100/90 px-2 py-0.5 rounded border border-purple-300">
+                          {deliveryTypeInModal === 'both' ? 'Үндсэн өндөр хурдны таталт' : 'Зөвхөн R2 товч харагдана'}
+                        </span>
+                      )}
+                    </div>
+
                     <R2FileUploader
                       passcode={passcode}
                       category={editingProduct.category || 'sfx'}
@@ -3116,7 +3219,6 @@ export default function AdminPage() {
                           ...editingProduct,
                           r2Key: key,
                           fileSize: size || editingProduct.fileSize,
-                          defaultWeTransferLink: editingProduct.defaultWeTransferLink || `https://r2.soniq.click/${key}`,
                         })
                       }}
                       onOpenSettings={() => {
@@ -3149,6 +3251,10 @@ export default function AdminPage() {
                         )}
                       </div>
                     </div>
+
+                    <p className="text-[11px] text-purple-900/80 leading-relaxed">
+                      ⚡ <strong>Cloudflare R2:</strong> Хэрэглэгчид <strong>зөвхөн Cloudflare R2 өндөр хурдны товч</strong> харагдаж татна.
+                    </p>
                   </div>
                 )}
               </div>
