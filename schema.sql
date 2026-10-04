@@ -101,8 +101,16 @@ CREATE TABLE IF NOT EXISTS store_settings (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Хэрэв хүснэгт аль хэдийн үүссэн бол categories баганыг нэмэх
+-- Хэрэв хүснэгт аль хэдийн үүссэн бол categories болон r2_config багануудыг нэмэх
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS categories JSONB;
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS r2_config JSONB;
+
+-- Хэрэв products хүснэгт аль хэдийн үүссэн бол дутуу багануудыг нөхөж нэмэх
+ALTER TABLE products ADD COLUMN IF NOT EXISTS notice TEXT DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS r2_key TEXT DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sample_video_url TEXT DEFAULT '';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS preview_sound_type VARCHAR(50) DEFAULT 'none';
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_bundle BOOLEAN DEFAULT FALSE;
 
 -- Анхдагч тохиргооны мөр оруулах (Хэрэв байхгүй бол)
 INSERT INTO store_settings (id, admin_passcode)
@@ -114,9 +122,16 @@ ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE store_settings ENABLE ROW LEVEL SECURITY;
 
--- Нийтэд харагдах эрх (Public Read)
+-- Бүтээгдэхүүн унших, засах, нэмэх эрхүүд (Public read, Full access)
 CREATE POLICY "Allow public read on products" ON products FOR SELECT USING (true);
 CREATE POLICY "Allow service role full access on products" ON products FOR ALL USING (true);
+-- Хэрэв anon key ашиглаж байгаа бол админ үйлдлүүдийг зөвшөөрөх
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'products' AND policyname = 'Allow anon full access on products') THEN
+    CREATE POLICY "Allow anon full access on products" ON products FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 CREATE POLICY "Allow service role full access on orders" ON orders FOR ALL USING (true);
 CREATE POLICY "Allow public insert on orders" ON orders FOR INSERT WITH CHECK (true);

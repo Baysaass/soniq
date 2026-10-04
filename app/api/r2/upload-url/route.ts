@@ -5,7 +5,7 @@ import { isR2Configured, generatePresignedUploadUrl } from '@/lib/r2-client'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { filename, contentType, fileSize, category, passcode } = body
+    const { filename, contentType, fileSize, category, passcode, r2Config } = body
 
     const isAuthorized = await db.verifyAdminPasscode(passcode || '')
     if (!isAuthorized) {
@@ -22,7 +22,8 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!isR2Configured()) {
+    const configured = await isR2Configured(r2Config)
+    if (!configured) {
       return NextResponse.json(
         {
           error: 'Cloudflare R2 тохируулаагүй байна. Админ "Тохиргоо" цэснээс R2 Account ID, Access Key оруулна уу.',
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
       fileSize: Number(fileSize) || undefined,
       prefix,
       expiresInSeconds: 3600, // 1 hour for large file upload
+      r2Config,
     })
 
     return NextResponse.json({

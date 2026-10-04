@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, invalidateProductsCache } from '@/lib/db'
 
 export async function GET(
   req: Request,
@@ -27,7 +27,8 @@ export async function PUT(
     const body = await req.json()
     const { passcode, ...updates } = body
 
-    const isAuthorized = await db.verifyAdminPasscode(passcode)
+    const adminPasscode = passcode || req.headers.get('x-admin-passcode') || ''
+    const isAuthorized = await db.verifyAdminPasscode(adminPasscode)
     if (!isAuthorized) {
       return NextResponse.json({ success: false, error: 'Нууц код буруу байна.' }, { status: 401 })
     }
@@ -43,6 +44,7 @@ export async function PUT(
       return NextResponse.json({ success: false, error: 'Бүтээгдэхүүн хадгалахад алдаа гарлаа.' }, { status: 400 })
     }
 
+    invalidateProductsCache()
     return NextResponse.json({ success: true, product: updated })
   } catch (err: unknown) {
     const error = err as Error

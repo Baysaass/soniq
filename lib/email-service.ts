@@ -630,7 +630,7 @@ export async function sendOrderApprovedEmail(params: {
     ''
 
   let r2DownloadUrl = ''
-  if (r2Key && isR2Configured()) {
+  if (r2Key && (await isR2Configured())) {
     try {
       const presigned = await generatePresignedDownloadUrl({
         key: r2Key,

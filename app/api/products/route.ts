@@ -37,7 +37,8 @@ export async function POST(req: Request) {
     const body = await req.json()
     const { passcode, ...productData } = body
 
-    const isAuthorized = await db.verifyAdminPasscode(passcode)
+    const adminPasscode = passcode || req.headers.get('x-admin-passcode') || ''
+    const isAuthorized = await db.verifyAdminPasscode(adminPasscode)
     if (!isAuthorized) {
       return NextResponse.json({ success: false, error: 'Нууц код буруу байна.' }, { status: 401 })
     }
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
     }
 
     const newProduct = await db.createProduct(productData)
+    invalidateProductsCache()
     return NextResponse.json({
       success: true,
       product: newProduct,

@@ -52,9 +52,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. If Cloudflare R2 is configured, upload directly to R2
-    if (isR2Configured()) {
-      const s3 = getR2Client()
-      const r2Cfg = getEffectiveR2Config()
+    if (await isR2Configured()) {
+      const s3 = await getR2Client()
+      const r2Cfg = await getEffectiveR2Config()
       if (s3 && r2Cfg.bucketName) {
         const objectKey = `images/products/${filename}`
         await s3.send(

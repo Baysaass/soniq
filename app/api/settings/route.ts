@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { invalidateR2ConfigCache } from '@/lib/r2-client'
 
 export async function GET(req: Request) {
   try {
@@ -49,6 +50,7 @@ export async function POST(req: Request) {
     }
 
     await db.saveSettings(updates)
+    invalidateR2ConfigCache()
     const updated = await db.getSettings()
     return NextResponse.json({
       success: true,

@@ -383,8 +383,11 @@ export default function AdminPage() {
   const fetchProducts = async (forceFresh = false) => {
     setProductsLoading(true)
     try {
-      const url = forceFresh ? '/api/products?fresh=1' : '/api/products'
-      const res = await fetch(url)
+      const url = forceFresh ? `/api/products?fresh=1&t=${Date.now()}` : '/api/products'
+      const res = await fetch(url, {
+        cache: forceFresh ? 'no-store' : 'default',
+        headers: forceFresh ? { 'Cache-Control': 'no-cache, no-store' } : {},
+      })
       if (res.ok) {
         const data = await res.json()
         if (data.products && Array.isArray(data.products)) {
@@ -716,6 +719,7 @@ export default function AdminPage() {
     setSavingProduct(true)
 
     try {
+      const activePasscode = passcode || (typeof window !== 'undefined' ? sessionStorage.getItem('soniq_admin_passcode') : '') || ''
       const isEdit = Boolean(editingProduct.id && editingProduct.id.trim())
       const targetId = editingProduct.id ? encodeURIComponent(editingProduct.id.trim()) : ''
       const url = isEdit ? `/api/products/${targetId}` : '/api/products'
@@ -735,19 +739,27 @@ export default function AdminPage() {
 
       const payload = {
         ...editingProduct,
+        title: (editingProduct.title || '').trim(),
         category: (editingProduct.category || 'sfx').trim(),
+        priceMNT: Math.round(Number(editingProduct.priceMNT) || 0),
+        originalPriceMNT: Math.round(Number(editingProduct.originalPriceMNT) || 0),
+        priceUSD: Number(editingProduct.priceUSD) || 0,
+        originalPriceUSD: Number(editingProduct.originalPriceUSD) || 0,
         image: currentImgs[0] || '/images/product-morph-3d.png',
         images: currentImgs,
         features: cleanFeatures.length > 0 ? cleanFeatures : ['Өндөр чанарын бүтээгдэхүүн', '100% Royalty Free лиценз'],
         fileFormats: cleanFormats,
         format: cleanFormats.length > 0 ? cleanFormats.join(', ') : (editingProduct.format || ''),
         previewSoundType: editingProduct.previewSoundType || 'none',
-        passcode,
+        passcode: activePasscode,
       }
 
       let res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': activePasscode,
+        },
         body: JSON.stringify(payload),
       })
 
@@ -755,7 +767,10 @@ export default function AdminPage() {
       if (!res.ok && res.status === 404 && isEdit) {
         res = await fetch('/api/products', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-passcode': activePasscode,
+          },
           body: JSON.stringify(payload),
         })
       }
@@ -764,6 +779,22 @@ export default function AdminPage() {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Бүтээгдэхүүн хадгалахад алдаа гарлаа.')
       }
+
+      // Optimistic update of UI: immediately show in list and cache
+      if (data.product) {
+        setProducts((prev) => {
+          const filtered = prev.filter((p) => p.id !== data.product.id && p.slug !== data.product.slug)
+          const updatedList = [data.product, ...filtered]
+          try {
+            localStorage.setItem('soniq_products_cache', JSON.stringify(updatedList))
+          } catch {}
+          return updatedList
+        })
+      }
+
+      // Reset any active filter or search query so user immediately sees the new product in the table
+      setProductSearch('')
+      setProductCategoryFilter('all')
 
       setIsProductModalOpen(false)
       fetchProducts(true)
@@ -2903,6 +2934,7 @@ export default function AdminPage() {
                       passcode={passcode}
                       category={editingProduct.category || 'sfx'}
                       currentKey={editingProduct.r2Key}
+                      r2Config={settings.r2Config}
                       onUploadSuccess={(key, size) => {
                         setEditingProduct({
                           ...editingProduct,

@@ -52,7 +52,7 @@ export async function GET(
 
     // If R2 key is present and configured, generate signed download URL
     const r2Key = order.r2Key || (order.items && order.items.find((i) => i.r2Key)?.r2Key)
-    if (r2Key && isR2Configured()) {
+    if (r2Key && (await isR2Configured())) {
       try {
         const filename = `${order.items[0]?.title || 'soniq-product'}.zip`
         const presigned = await generatePresignedDownloadUrl({

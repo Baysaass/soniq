@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Хандах эрхгүй' }, { status: 401 })
     }
 
-    if (!isR2Configured()) {
+    if (!(await isR2Configured())) {
       return NextResponse.json({ files: [], configured: false })
     }
 

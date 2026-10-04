@@ -95,20 +95,24 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
   if (prod.subtitle !== undefined) row.subtitle = prod.subtitle
   if (prod.category !== undefined) row.category = prod.category
   if (prod.badge !== undefined) row.badge = prod.badge
-  if (prod.rating !== undefined) row.rating = prod.rating
-  if (prod.reviewCount !== undefined) row.review_count = prod.reviewCount
-  if (prod.priceMNT !== undefined) row.price_mnt = prod.priceMNT
-  if (prod.originalPriceMNT !== undefined) row.original_price_mnt = prod.originalPriceMNT
-  if (prod.priceUSD !== undefined) row.price_usd = prod.priceUSD
-  if (prod.originalPriceUSD !== undefined) row.original_price_usd = prod.originalPriceUSD
+  if (prod.rating !== undefined) row.rating = Number(prod.rating) || 5.0
+  if (prod.reviewCount !== undefined) row.review_count = Math.round(Number(prod.reviewCount) || 1)
+  if (prod.priceMNT !== undefined) row.price_mnt = Math.round(Number(prod.priceMNT) || 0)
+  if (prod.originalPriceMNT !== undefined) row.original_price_mnt = Math.round(Number(prod.originalPriceMNT) || 0)
+  if (prod.priceUSD !== undefined) row.price_usd = Number(prod.priceUSD) || 0
+  if (prod.originalPriceUSD !== undefined) row.original_price_usd = Number(prod.originalPriceUSD) || 0
   if (prod.images !== undefined || prod.image !== undefined) {
     const list = Array.isArray(prod.images) && prod.images.length > 0
       ? prod.images.slice(0, 6)
       : (prod.image ? [prod.image] : [])
     row.image = list.length > 1 ? list.join('|||') : (list[0] || prod.image || '/images/product-morph-3d.png')
   }
-  if (prod.features !== undefined) row.features = prod.features
-  if (prod.compatibility !== undefined) row.compatibility = prod.compatibility
+  if (prod.features !== undefined) {
+    row.features = Array.isArray(prod.features) ? prod.features : []
+  }
+  if (prod.compatibility !== undefined) {
+    row.compatibility = Array.isArray(prod.compatibility) ? prod.compatibility : []
+  }
   if (prod.fileFormats !== undefined && Array.isArray(prod.fileFormats)) {
     row.format = prod.fileFormats.join(', ')
   } else if (prod.format !== undefined) {
@@ -120,9 +124,11 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
   if (prod.sampleVideoUrl !== undefined) row.sample_video_url = prod.sampleVideoUrl
   if (prod.r2Key !== undefined) row.r2_key = prod.r2Key
   if (prod.previewSoundType !== undefined) row.preview_sound_type = prod.previewSoundType
-  if (prod.isBundle !== undefined) row.is_bundle = prod.isBundle
+  if (prod.isBundle !== undefined) row.is_bundle = Boolean(prod.isBundle)
   if (prod.description !== undefined) row.description = prod.description
-  if (prod.notice !== undefined) row.notice = prod.notice
+  // Only add notice if it is non-empty string, because products schema might not have it
+  if (prod.notice && prod.notice.trim()) row.notice = prod.notice.trim()
+  row.created_at = prod.createdAt || new Date().toISOString()
   row.updated_at = new Date().toISOString()
   return row
 }
@@ -202,6 +208,61 @@ function mapOrderUpdatesToRow(updates: Partial<Order>): Record<string, any> {
   return row
 }
 
+// Helper for executing Supabase inserts/updates with self-healing retry logic
+// Automatically handles missing schema columns, slug unique collisions, and primary key collisions
+async function executeSupabaseWithSelfHealing(
+  operation: (rowToUse: Record<string, any>) => Promise<{ data: any; error: any }>,
+  initialRow: Record<string, any>
+): Promise<any> {
+  const row = { ...initialRow }
+  const maxRetries = 6
+  let lastError: any = null
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { data, error } = await operation(row)
+    if (!error) {
+      return data
+    }
+
+    lastError = error
+    const errMsg = error.message || error.details || ''
+
+    // 1. Detect missing column error from PostgreSQL / PostgREST
+    // e.g.: column "notice" of relation "products" does not exist
+    // Could not find the 'notice' column of 'products' in the schema cache
+    const missingColMatch =
+      errMsg.match(/column ["']?([a-zA-Z0-9_]+)["']? of relation ["']?products["']? does not exist/i) ||
+      errMsg.match(/Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column of ['"]?products['"]? in the schema cache/i) ||
+      errMsg.match(/column products\.([a-zA-Z0-9_]+) does not exist/i)
+
+    if (missingColMatch && missingColMatch[1]) {
+      const colName = missingColMatch[1]
+      console.warn(`[Supabase self-healing] Missing column "${colName}" detected in Supabase. Stripping column and retrying (${attempt + 1}/${maxRetries})...`)
+      delete row[colName]
+      continue
+    }
+
+    // 2. Duplicate slug unique constraint violation
+    if (errMsg.includes('products_slug_key') || (errMsg.includes('duplicate key') && errMsg.includes('slug'))) {
+      row.slug = `${row.slug || 'pack'}-${Math.random().toString(36).slice(2, 7)}`
+      console.warn(`[Supabase self-healing] Duplicate slug detected. Adjusted to "${row.slug}" and retrying...`)
+      continue
+    }
+
+    // 3. Duplicate id primary key violation
+    if (errMsg.includes('products_pkey') || (errMsg.includes('duplicate key') && errMsg.includes('id'))) {
+      row.id = `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+      console.warn(`[Supabase self-healing] Duplicate id detected. Adjusted to "${row.id}" and retrying...`)
+      continue
+    }
+
+    // If unhandled error, break loop and throw
+    break
+  }
+
+  throw new Error(lastError?.message || 'Supabase operation failed')
+}
+
 export const supabaseDB = {
   async getProducts(): Promise<StoreProduct[]> {
     const supabase = getSupabaseClient()
@@ -235,21 +296,37 @@ export const supabaseDB = {
 
   async createProduct(product: Partial<StoreProduct>): Promise<StoreProduct | null> {
     const supabase = getSupabaseClient()
-    if (!supabase) return null
+    if (!supabase) {
+      console.error('Supabase client is not initialized (check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)')
+      throw new Error('Supabase мэдээллийн сантай холбогдоогүй байна. SUPABASE_URL болон түлхүүрээ шалгана уу.')
+    }
     const cleanId = (product.id && product.id.trim()) ? product.id.trim() : `prod_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
-    const cleanSlug = (product.slug && product.slug.trim())
+    let cleanSlug = (product.slug && product.slug.trim())
       ? product.slug.trim()
       : ((product.title || 'pack').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || `pack-${Date.now()}`)
+
+    // Proactively check slug collision
+    try {
+      const { data: existing } = await supabase.from('products').select('id').eq('slug', cleanSlug).maybeSingle()
+      if (existing && existing.id !== cleanId) {
+        cleanSlug = `${cleanSlug}-${Date.now().toString(36)}`
+      }
+    } catch {
+      // Ignore pre-check failure
+    }
+
     const row = mapProductToRow({
       ...product,
       id: cleanId,
       slug: cleanSlug,
     })
-    const { data, error } = await supabase.from('products').insert([row]).select('*').single()
-    if (error) {
-      console.error('Supabase createProduct error:', error)
-      throw new Error(error.message)
-    }
+
+    const data = await executeSupabaseWithSelfHealing(
+      (r) => supabase.from('products').insert([r]).select('*').single(),
+      row
+    )
+
+    if (!data) return null
     return mapProductRow(data)
   },
 
@@ -266,26 +343,28 @@ export const supabaseDB = {
 
     // 1. Try updating by id
     if (targetId) {
-      const { data, error } = await supabase
-        .from('products')
-        .update(row)
-        .eq('id', targetId)
-        .select('*')
-        .maybeSingle()
-
-      if (data && !error) return mapProductRow(data)
+      try {
+        const data = await executeSupabaseWithSelfHealing(
+          (r) => supabase.from('products').update(r).eq('id', targetId).select('*').maybeSingle(),
+          row
+        )
+        if (data) return mapProductRow(data)
+      } catch (err) {
+        console.warn('Supabase update by id failed:', err)
+      }
     }
 
     // 2. Try updating by slug
     if (targetSlug) {
-      const { data, error } = await supabase
-        .from('products')
-        .update(row)
-        .eq('slug', targetSlug)
-        .select('*')
-        .maybeSingle()
-
-      if (data && !error) return mapProductRow(data)
+      try {
+        const data = await executeSupabaseWithSelfHealing(
+          (r) => supabase.from('products').update(r).eq('slug', targetSlug).select('*').maybeSingle(),
+          row
+        )
+        if (data) return mapProductRow(data)
+      } catch (err) {
+        console.warn('Supabase update by slug failed:', err)
+      }
     }
 
     // 3. Fallback: Upsert product if not found
@@ -298,6 +377,7 @@ export const supabaseDB = {
       if (newProduct) return newProduct
     } catch (createErr) {
       console.error('Supabase fallback createProduct failed:', createErr)
+      throw createErr
     }
 
     return null
@@ -397,6 +477,12 @@ export const supabaseDB = {
         ? bankInfo.categories
         : DEFAULT_STORE_CATEGORIES
 
+    const r2Config = (data.r2_config && typeof data.r2_config === 'object' && (data.r2_config.accountId || data.r2_config.accessKeyId))
+      ? data.r2_config
+      : (bankInfo.r2Config && typeof bankInfo.r2Config === 'object')
+        ? bankInfo.r2Config
+        : {}
+
     return {
       storeName: data.store_name,
       subdomain: data.subdomain,
@@ -406,7 +492,7 @@ export const supabaseDB = {
       categories,
       bankInfo,
       defaultBundleWeTransfer: data.default_bundle_wetransfer || '',
-      r2Config: data.r2_config || {},
+      r2Config,
       telegramBotToken: bankInfo.telegramBotToken || '',
       telegramChatId: bankInfo.telegramChatId || '',
       resendApiKey: bankInfo.resendApiKey || '',
@@ -424,15 +510,16 @@ export const supabaseDB = {
     if (settings.adminPasscode !== undefined) row.admin_passcode = settings.adminPasscode
     if (settings.announcementText !== undefined) row.announcement_text = settings.announcementText
 
-    // Always store categories, telegram credentials, resend config inside bank_info JSONB
-    // so it is 100% safe from table column mismatch errors
+    // Always store categories, telegram credentials, resend config, and R2 credentials inside bank_info JSONB
+    // so it is 100% safe from table column mismatch errors even if dynamic columns do not exist yet in Supabase
     if (
       settings.bankInfo !== undefined ||
       settings.telegramBotToken !== undefined ||
       settings.telegramChatId !== undefined ||
       settings.categories !== undefined ||
       settings.resendApiKey !== undefined ||
-      settings.emailFrom !== undefined
+      settings.emailFrom !== undefined ||
+      settings.r2Config !== undefined
     ) {
       row.bank_info = {
         ...(settings.bankInfo || {}),
@@ -441,23 +528,33 @@ export const supabaseDB = {
         ...(settings.categories !== undefined ? { categories: settings.categories } : {}),
         ...(settings.resendApiKey !== undefined ? { resendApiKey: settings.resendApiKey } : {}),
         ...(settings.emailFrom !== undefined ? { emailFrom: settings.emailFrom } : {}),
+        ...(settings.r2Config !== undefined ? { r2Config: settings.r2Config } : {}),
       }
     }
     if (settings.defaultBundleWeTransfer !== undefined) row.default_bundle_wetransfer = settings.defaultBundleWeTransfer
     if (settings.r2Config !== undefined) row.r2_config = settings.r2Config
 
-    // Try upserting with categories column if it exists in the table, otherwise fallback without it
+    // Try upserting with full row (including categories and r2_config columns)
+    const rowWithCols = { ...row }
     if (settings.categories !== undefined) {
-      const rowWithCol = { ...row, categories: settings.categories }
-      const resWithCol = await supabase.from('store_settings').upsert(rowWithCol)
-      if (!resWithCol.error) return true
-      if (resWithCol.error.message && !resWithCol.error.message.includes('column')) {
-        console.error('Supabase saveSettings error:', resWithCol.error)
-        return false
-      }
+      rowWithCols.categories = settings.categories
     }
 
-    const { error } = await supabase.from('store_settings').upsert(row)
+    let { error } = await supabase.from('store_settings').upsert(rowWithCols)
+    if (!error) return true
+
+    // If column error occurs (e.g. categories or r2_config does not exist in user's older schema),
+    // retry without those specific columns because they are safely stored in bank_info JSONB
+    if (error.message && error.message.toLowerCase().includes('column')) {
+      console.warn('Supabase store_settings column mismatch, retrying with safe fallback:', error.message)
+      const safeRow = { ...row }
+      delete safeRow.categories
+      delete safeRow.r2_config
+      const retryRes = await supabase.from('store_settings').upsert(safeRow)
+      if (!retryRes.error) return true
+      error = retryRes.error
+    }
+
     if (error) {
       console.error('Supabase saveSettings error:', error)
       return false

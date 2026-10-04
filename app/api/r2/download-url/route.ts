@@ -22,7 +22,7 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!isR2Configured()) {
+    if (!(await isR2Configured())) {
       return NextResponse.json(
         { error: 'Cloudflare R2 тохируулаагүй байна.' },
         { status: 400 }

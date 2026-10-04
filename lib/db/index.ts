@@ -111,17 +111,25 @@ export const db = {
     if (provider === 'supabase') {
       try {
         const prod = await supabaseDB.createProduct(data)
-        if (prod) return prod
-      } catch (err) {
-        console.error('Supabase createProduct failed, saving locally:', err)
+        if (prod) {
+          try { await localDB.createProduct(prod) } catch {}
+          return prod
+        }
+      } catch (err: any) {
+        console.error('Supabase createProduct failed:', err)
+        throw new Error(`Supabase-д хадгалахад алдаа гарлаа: ${err?.message || err}`)
       }
     }
     if (provider === 'postgres') {
       try {
         const prod = await postgresDB.createProduct(data)
-        if (prod) return prod
-      } catch (err) {
-        console.error('PostgreSQL createProduct failed, saving locally:', err)
+        if (prod) {
+          try { await localDB.createProduct(prod) } catch {}
+          return prod
+        }
+      } catch (err: any) {
+        console.error('PostgreSQL createProduct failed:', err)
+        throw new Error(`PostgreSQL-д хадгалахад алдаа гарлаа: ${err?.message || err}`)
       }
     }
     return localDB.createProduct(data)
@@ -133,17 +141,25 @@ export const db = {
     if (provider === 'supabase') {
       try {
         const updated = await supabaseDB.updateProduct(id, updates)
-        if (updated) return updated
-      } catch (err) {
-        console.error('Supabase updateProduct failed, updating locally:', err)
+        if (updated) {
+          try { await localDB.updateProduct(id, updated) } catch {}
+          return updated
+        }
+      } catch (err: any) {
+        console.error('Supabase updateProduct failed:', err)
+        throw new Error(`Supabase-д шинэчлэхэд алдаа гарлаа: ${err?.message || err}`)
       }
     }
     if (provider === 'postgres') {
       try {
         const updated = await postgresDB.updateProduct(id, updates)
-        if (updated) return updated
-      } catch (err) {
-        console.error('PostgreSQL updateProduct failed, updating locally:', err)
+        if (updated) {
+          try { await localDB.updateProduct(id, updated) } catch {}
+          return updated
+        }
+      } catch (err: any) {
+        console.error('PostgreSQL updateProduct failed:', err)
+        throw new Error(`PostgreSQL-д шинэчлэхэд алдаа гарлаа: ${err?.message || err}`)
       }
     }
     return localDB.updateProduct(id, updates)

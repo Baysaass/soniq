@@ -38,16 +38,36 @@ export interface StoreSettingsType {
   emailFrom?: string
 }
 
+let latestSettingsCache: StoreSettingsType | null = null
+
+export function setInMemorySettings(settings: StoreSettingsType) {
+  latestSettingsCache = settings
+}
+
 export async function getStoreSettingsAsync(): Promise<StoreSettingsType> {
-  return db.getSettings()
+  const settings = await db.getSettings()
+  if (settings) {
+    latestSettingsCache = settings
+  }
+  return settings
 }
 
 export function getStoreSettings(): StoreSettingsType {
+  if (latestSettingsCache) {
+    return latestSettingsCache
+  }
   return localDB.getSettings()
 }
 
 export async function saveStoreSettingsAsync(newSettings: Partial<StoreSettingsType>): Promise<boolean> {
-  return db.saveSettings(newSettings)
+  const success = await db.saveSettings(newSettings)
+  if (latestSettingsCache) {
+    latestSettingsCache = {
+      ...latestSettingsCache,
+      ...newSettings,
+    }
+  }
+  return success
 }
 
 export function saveStoreSettings(newSettings: Partial<StoreSettingsType>): boolean {

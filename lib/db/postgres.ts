@@ -399,6 +399,12 @@ export const postgresDB = {
           ? bankInfo.categories
           : DEFAULT_STORE_CATEGORIES
 
+      const r2Config = (data.r2_config && typeof data.r2_config === 'object' && (data.r2_config.accountId || data.r2_config.accessKeyId))
+        ? data.r2_config
+        : (bankInfo.r2Config && typeof bankInfo.r2Config === 'object')
+          ? bankInfo.r2Config
+          : {}
+
       return {
         storeName: data.store_name,
         subdomain: data.subdomain,
@@ -408,30 +414,31 @@ export const postgresDB = {
         categories,
         bankInfo,
         defaultBundleWeTransfer: data.default_bundle_wetransfer || '',
-        r2Config: data.r2_config || {},
+        r2Config,
         telegramBotToken: bankInfo.telegramBotToken || '',
         telegramChatId: bankInfo.telegramChatId || '',
         resendApiKey: bankInfo.resendApiKey || '',
         emailFrom: bankInfo.emailFrom || '',
       }
     } catch (err) {
-      console.error('PostgreSQL getSettings error:', err)
-      return null
-    }
-  },
-
-  async saveSettings(settings: Partial<StoreSettingsType>): Promise<boolean> {
-    const pool = getPostgresPool()
-    if (!pool) return false
-    try {
-      const bankInfoMerged = {
-        ...(settings.bankInfo || {}),
-        ...(settings.telegramBotToken !== undefined ? { telegramBotToken: settings.telegramBotToken } : {}),
-        ...(settings.telegramChatId !== undefined ? { telegramChatId: settings.telegramChatId } : {}),
-        ...(settings.categories !== undefined ? { categories: settings.categories } : {}),
-        ...(settings.resendApiKey !== undefined ? { resendApiKey: settings.resendApiKey } : {}),
-        ...(settings.emailFrom !== undefined ? { emailFrom: settings.emailFrom } : {}),
+        console.error('PostgreSQL getSettings error:', err)
+        return null
       }
+    },
+
+    async saveSettings(settings: Partial<StoreSettingsType>): Promise<boolean> {
+      const pool = getPostgresPool()
+      if (!pool) return false
+      try {
+        const bankInfoMerged = {
+          ...(settings.bankInfo || {}),
+          ...(settings.telegramBotToken !== undefined ? { telegramBotToken: settings.telegramBotToken } : {}),
+          ...(settings.telegramChatId !== undefined ? { telegramChatId: settings.telegramChatId } : {}),
+          ...(settings.categories !== undefined ? { categories: settings.categories } : {}),
+          ...(settings.resendApiKey !== undefined ? { resendApiKey: settings.resendApiKey } : {}),
+          ...(settings.emailFrom !== undefined ? { emailFrom: settings.emailFrom } : {}),
+          ...(settings.r2Config !== undefined ? { r2Config: settings.r2Config } : {}),
+        }
 
       const query = `
         INSERT INTO store_settings (

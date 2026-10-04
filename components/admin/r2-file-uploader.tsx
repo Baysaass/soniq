@@ -17,6 +17,7 @@ interface R2FileUploaderProps {
   passcode: string
   category?: string
   currentKey?: string
+  r2Config?: any
   onUploadSuccess: (key: string, fileSize: string) => void
   onOpenSettings?: () => void
 }
@@ -39,6 +40,7 @@ export function R2FileUploader({
   passcode,
   category = 'sfx',
   currentKey,
+  r2Config,
   onUploadSuccess,
   onOpenSettings,
 }: R2FileUploaderProps) {
@@ -94,6 +96,7 @@ export function R2FileUploader({
           fileSize: selectedFile.size,
           category,
           passcode,
+          r2Config: r2Config || undefined,
         }),
       })
 

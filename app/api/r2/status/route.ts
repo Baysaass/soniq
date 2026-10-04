@@ -3,8 +3,8 @@ import { isR2Configured, testR2Connection, getEffectiveR2Config } from '@/lib/r2
 
 export async function GET() {
   try {
-    const configured = isR2Configured()
-    const cfg = getEffectiveR2Config()
+    const configured = await isR2Configured()
+    const cfg = await getEffectiveR2Config()
 
     if (!configured) {
       return NextResponse.json({
@@ -48,8 +48,8 @@ export async function POST(req: Request) {
       publicDomain: typeof publicDomain === 'string' ? publicDomain.trim() : undefined,
     }
 
-    const configured = isR2Configured(override)
-    const cfg = getEffectiveR2Config(override)
+    const configured = await isR2Configured(override)
+    const cfg = await getEffectiveR2Config(override)
 
     if (!configured) {
       return NextResponse.json({
