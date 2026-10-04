@@ -211,7 +211,7 @@ function mapOrderUpdatesToRow(updates: Partial<Order>): Record<string, any> {
 // Helper for executing Supabase inserts/updates with self-healing retry logic
 // Automatically handles missing schema columns, slug unique collisions, and primary key collisions
 async function executeSupabaseWithSelfHealing(
-  operation: (rowToUse: Record<string, any>) => Promise<{ data: any; error: any }>,
+  operation: (rowToUse: Record<string, any>) => PromiseLike<{ data: any; error: any }> | Promise<any>,
   initialRow: Record<string, any>
 ): Promise<any> {
   const row = { ...initialRow }

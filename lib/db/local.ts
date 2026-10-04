@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { STORE_SETTINGS, StoreProduct } from '../store-data'
+import { STORE_SETTINGS, StoreProduct, DEFAULT_STORE_CATEGORIES } from '../store-data'
 import type { Order } from '../orders-db'
 import type { StoreSettingsType } from '../settings-db'
 

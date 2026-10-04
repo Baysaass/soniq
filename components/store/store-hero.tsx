@@ -15,9 +15,11 @@ import {
   Cpu,
   AlertTriangle,
   CheckCircle2,
+  Gift,
 } from 'lucide-react'
 import { ULTIMATE_BUNDLE } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
+import { SafeProductImage } from '@/components/store/safe-image'
 
 export function StoreHero() {
   const {
@@ -126,7 +128,7 @@ export function StoreHero() {
               {/* Left: Product Artwork & Audio Preview */}
               <div className="lg:col-span-5 flex flex-col items-center">
                 <div className="relative w-full aspect-[16/10] sm:aspect-[4/3] max-w-[360px] rounded-xl overflow-hidden border border-[#E6E6E3] bg-zinc-100 group shadow-xs">
-                  <Image
+                  <SafeProductImage
                     src={currentBundle.image}
                     alt={currentBundle.title}
                     fill
@@ -136,9 +138,16 @@ export function StoreHero() {
 
                   {/* Badge & Video indicator */}
                   <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
-                    <div className="bg-[#141414] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xs">
-                      {currentBundle.badge || '85% ХЭМНЭЛТ'}
-                    </div>
+                    {(currentBundle.isFree || (currentBundle.priceMNT === 0 && currentBundle.priceUSD === 0)) ? (
+                      <div className="bg-emerald-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                        <Gift className="w-3 h-3" />
+                        <span>ҮНЭГҮЙ</span>
+                      </div>
+                    ) : (
+                      <div className="bg-[#141414] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xs">
+                        {currentBundle.badge || '85% ХЭМНЭЛТ'}
+                      </div>
+                    )}
                     {currentBundle.sampleVideoUrl && (
                       <Link
                         href={`/shop/product/${currentBundle.slug}`}
@@ -232,34 +241,61 @@ export function StoreHero() {
                 {/* Price & Purchase CTA */}
                 <div className="mt-4 pt-3.5 border-t border-[#E6E6E3] flex items-center justify-between flex-wrap gap-3">
                   <div>
-                    <span className="text-[11px] text-zinc-400 line-through font-mono block">
-                      {formatPrice(currentBundle.originalPriceMNT, currentBundle.originalPriceUSD)}
-                    </span>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl sm:text-[28px] font-black text-[#141414] tracking-tight">
-                        {formatPrice(currentBundle.priceMNT, currentBundle.priceUSD)}
-                      </span>
-                      <span className="text-[10px] font-bold text-[#0088CC] bg-[#E5F6FF] px-1.5 py-0.5 rounded">
-                        Нэг удаа төлнө
-                      </span>
-                    </div>
+                    {currentBundle.isFree || (currentBundle.priceMNT === 0 && currentBundle.priceUSD === 0) ? (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-[28px] font-black text-emerald-600 tracking-tight flex items-center gap-1.5">
+                          <Gift className="w-6 h-6 text-emerald-600" />
+                          <span>ҮНЭГҮЙ (0₮)</span>
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                          100% Free
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <span className="text-[11px] text-zinc-400 line-through font-mono block">
+                          {formatPrice(currentBundle.originalPriceMNT, currentBundle.originalPriceUSD)}
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-[28px] font-black text-[#141414] tracking-tight">
+                            {formatPrice(currentBundle.priceMNT, currentBundle.priceUSD)}
+                          </span>
+                          <span className="text-[10px] font-bold text-[#0088CC] bg-[#E5F6FF] px-1.5 py-0.5 rounded">
+                            Нэг удаа төлнө
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => openCheckoutWithProduct(currentBundle)}
-                      className="py-2 px-4.5 rounded-full bg-[#141414] hover:bg-black text-white font-semibold text-xs tracking-wide transition-all shadow-xs hover:shadow-md cursor-pointer flex items-center gap-1.5"
-                    >
-                      <span>Шууд авах</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                    {currentBundle.isFree || (currentBundle.priceMNT === 0 && currentBundle.priceUSD === 0) ? (
+                      <button
+                        onClick={() => openCheckoutWithProduct(currentBundle)}
+                        className="py-2.5 px-5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wide transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-2"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Үнэгүй шууд татах</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => openCheckoutWithProduct(currentBundle)}
+                          className="py-2 px-4.5 rounded-full bg-[#141414] hover:bg-black text-white font-semibold text-xs tracking-wide transition-all shadow-xs hover:shadow-md cursor-pointer flex items-center gap-1.5"
+                        >
+                          <span>Шууд авах</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
 
-                    <button
-                      onClick={() => addToCart(currentBundle, true)}
-                      className="py-2 px-3.5 rounded-full bg-white hover:bg-zinc-50 border border-[#E6E6E3] text-zinc-800 font-semibold text-xs transition-colors cursor-pointer"
-                    >
-                      Сагслах
-                    </button>
+                        <button
+                          onClick={() => addToCart(currentBundle, true)}
+                          className="py-2 px-3.5 rounded-full bg-white hover:bg-zinc-50 border border-[#E6E6E3] text-zinc-800 font-semibold text-xs transition-colors cursor-pointer"
+                        >
+                          Сагслах
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { STORE_PRODUCTS, ULTIMATE_BUNDLE, STORE_SETTINGS, StoreProduct } from './store-data'
+import { STORE_PRODUCTS, ULTIMATE_BUNDLE, STORE_SETTINGS, StoreProduct, DEFAULT_STORE_CATEGORIES } from './store-data'
 import { audioSynthesizer } from './audio-synthesizer'
 
 export interface CartItem {
@@ -204,6 +204,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const cartTotalUSD = cart.reduce((total, item) => total + item.product.priceUSD * item.quantity, 0)
 
   const formatPrice = (mnt: number, usd: number) => {
+    if (mnt === 0 && usd === 0) {
+      return 'ҮНЭГҮЙ'
+    }
     if (currency === 'USD') {
       return `$${usd.toFixed(2)}`
     }

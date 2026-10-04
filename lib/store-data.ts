@@ -22,10 +22,13 @@ export interface StoreProduct {
   previewSoundType?: 'whoosh' | 'impact' | 'braam' | 'ui' | 'glitch' | 'anime' | 'riser' | 'none' | ''
   fileFormats?: string[]
   isBundle?: boolean
+  isFree?: boolean
   description: string
   sampleVideoUrl?: string
   r2Key?: string
   notice?: string // Optional warning / notice text
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface StoreCategory {

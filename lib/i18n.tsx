@@ -118,6 +118,7 @@ export const translations = {
     footer_headline: 'SFX хайхад биш, Edit хийхэд цагаа зарцуул.',
     footer_sub: 'Freelancer, YouTuber, Motion Designer, Video Editor-уудын workflow-д зориулсан.',
     footer_cta: 'Soniq авах',
+    footer_no_cc: 'Нэг удаагийн төлбөр · Насан туршийн эрх',
     footer_copyright: '© 2026 Soniq',
 
   },

@@ -6,7 +6,7 @@ import { isR2Configured, generatePresignedDownloadUrl } from './r2-client'
 
 export interface EmailSendResult {
   success: boolean
-  provider: 'resend' | 'smtp' | 'simulated'
+  provider: 'resend' | 'smtp' | 'simulated' | 'resend-failed' | 'not-configured'
   messageId?: string
   recipient: string
   error?: string
@@ -19,7 +19,7 @@ export interface EmailLogEntry {
   recipient: string
   subject: string
   sentAt: string
-  provider: 'resend' | 'smtp' | 'simulated'
+  provider: 'resend' | 'smtp' | 'simulated' | 'resend-failed' | 'not-configured'
   success: boolean
   error?: string
   html: string

@@ -1,18 +1,31 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendTelegramOrderNotification } from '@/lib/telegram'
-import { sendOrderCreatedEmail } from '@/lib/email-service'
+import { sendOrderCreatedEmail, sendOrderApprovedEmail } from '@/lib/email-service'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { customerName, customerEmail, customerPhone, items, totalAmountMNT, totalAmountUSD, currency, paymentMethod, customerNotes, receiptNote } = body
 
-    if (!customerName || !customerEmail || !customerPhone || !items || items.length === 0) {
-      return NextResponse.json(
-        { error: 'Бүх шаардлагатай мэдээллийг (нэр, и-мэйл, утасны дугаар) оруулна уу.' },
-        { status: 400 }
-      )
+    const isFree =
+      (Number(totalAmountMNT || 0) === 0 && Number(totalAmountUSD || 0) === 0) ||
+      paymentMethod === 'FREE_DOWNLOAD'
+
+    if (isFree) {
+      if (!customerEmail || !items || items.length === 0) {
+        return NextResponse.json(
+          { error: 'И-мэйл хаягаа оруулна уу.' },
+          { status: 400 }
+        )
+      }
+    } else {
+      if (!customerName || !customerEmail || !customerPhone || !items || items.length === 0) {
+        return NextResponse.json(
+          { error: 'Бүх шаардлагатай мэдээллийг (нэр, и-мэйл, утасны дугаар) оруулна уу.' },
+          { status: 400 }
+        )
+      }
     }
 
     // Enrich items with fresh product download metadata from DB
@@ -24,8 +37,8 @@ export async function POST(request: Request) {
             return {
               ...item,
               title: product.title || item.title,
-              price: item.price ?? product.priceMNT,
-              priceUSD: item.priceUSD ?? product.priceUSD,
+              price: isFree ? 0 : (item.price ?? product.priceMNT),
+              priceUSD: isFree ? 0 : (item.priceUSD ?? product.priceUSD),
               image: product.image || item.image,
               weTransferLink: product.defaultWeTransferLink || item.weTransferLink || '',
               r2Key: product.r2Key || item.r2Key || '',
@@ -60,37 +73,58 @@ export async function POST(request: Request) {
       }
     }
 
+    const finalCustomerName =
+      (customerName || '').trim() ||
+      (customerEmail ? customerEmail.split('@')[0] : 'Зочин')
+    const finalCustomerPhone =
+      (customerPhone || '').trim() || (isFree ? 'Үнэгүй таталт' : '')
+    const finalStatus = isFree ? 'APPROVED' : 'PENDING'
+    const finalPaymentMethod = isFree ? 'FREE_DOWNLOAD' : (paymentMethod || 'KHAN_BANK')
+    const finalApprovedAt = isFree ? new Date().toISOString() : null
+
     const order = await db.createOrder({
-      customerName,
-      customerEmail,
-      customerPhone,
+      customerName: finalCustomerName,
+      customerEmail: (customerEmail || '').trim(),
+      customerPhone: finalCustomerPhone,
       customerNotes,
-      receiptNote,
+      receiptNote: isFree ? 'Үнэгүй таталт' : receiptNote,
       items: enrichedItems,
-      totalAmountMNT: totalAmountMNT || 0,
-      totalAmountUSD: totalAmountUSD || 0,
+      totalAmountMNT: isFree ? 0 : (totalAmountMNT || 0),
+      totalAmountUSD: isFree ? 0 : (totalAmountUSD || 0),
       currency: currency || 'MNT',
-      paymentMethod: paymentMethod || 'KHAN_BANK',
+      paymentMethod: finalPaymentMethod,
       weTransferLink: orderWeTransferLink,
       r2Key: orderR2Key,
+      status: finalStatus,
+      approvedAt: finalApprovedAt,
     })
 
     const siteUrl = new URL(request.url).origin
 
-    // Dispatch Telegram notification (non-blocking) with 1-Click Approve button
+    // Dispatch Telegram notification (non-blocking)
     sendTelegramOrderNotification(order, siteUrl).catch((err) => {
       console.warn('Telegram notification background warning:', err)
     })
 
-    // Dispatch Customer Order Confirmation Email (non-blocking)
-    sendOrderCreatedEmail({ order, siteUrl }).catch((err) => {
-      console.warn('Order confirmation email background warning:', err)
-    })
+    // If free, send the approved email directly with download links.
+    // If paid, send the order created/pending email.
+    if (isFree) {
+      sendOrderApprovedEmail({ order, siteUrl }).catch((err) => {
+        console.warn('Order approved email background warning:', err)
+      })
+    } else {
+      sendOrderCreatedEmail({ order, siteUrl }).catch((err) => {
+        console.warn('Order confirmation email background warning:', err)
+      })
+    }
 
     return NextResponse.json({
       success: true,
       orderId: order.id,
       order,
+      isFree,
+      downloadUrl: orderWeTransferLink,
+      r2Key: orderR2Key,
     })
   } catch (error: any) {
     console.error('Error creating order:', error)

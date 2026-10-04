@@ -48,6 +48,7 @@ import {
   AlertTriangle,
   FolderPlus,
   Tag,
+  Gift,
 } from 'lucide-react'
 import { STORE_SETTINGS, StoreProduct, StoreCategory, DEFAULT_STORE_CATEGORIES } from '@/lib/store-data'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
@@ -640,34 +641,67 @@ export default function AdminPage() {
     try {
       for (let i = 0; i < filesToProcess.length; i++) {
         const file = filesToProcess[i]
-        setUploadProgressText(`${i + 1} / ${filesToProcess.length}: "${file.name}" зургийг WebP руу хөрвүүлж байна...`)
+        const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif')
 
-        // Convert to WebP in browser canvas
-        const webpResult = await convertImageFileToWebP(file, {
-          maxWidth: 1600,
-          maxHeight: 1600,
-          quality: 0.85,
-        })
+        if (isGif) {
+          setUploadProgressText(`${i + 1} / ${filesToProcess.length}: "${file.name}" GIF хөдөлгөөнт зургийг хуулж байна...`)
 
-        // Upload to server endpoint
-        const formData = new FormData()
-        formData.append('file', webpResult.file)
-        formData.append('passcode', activePasscode)
+          // Upload original GIF directly to preserve full frame animation
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('passcode', activePasscode)
 
-        const res = await fetch('/api/admin/upload-image', {
-          method: 'POST',
-          headers: {
-            'x-admin-passcode': activePasscode,
-          },
-          body: formData,
-        })
+          const res = await fetch('/api/admin/upload-image', {
+            method: 'POST',
+            headers: {
+              'x-admin-passcode': activePasscode,
+            },
+            body: formData,
+          })
 
-        const data = await res.json()
-        if (res.ok && data.url) {
-          newUploadedUrls.push(data.url)
+          const data = await res.json()
+          if (res.ok && data.url) {
+            newUploadedUrls.push(data.url)
+          } else {
+            // Fallback to dataUrl without losing animation
+            const gifDataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader()
+              reader.onload = () => resolve(reader.result as string)
+              reader.onerror = () => reject(new Error('GIF файлыг уншиж чадсангүй.'))
+              reader.readAsDataURL(file)
+            })
+            newUploadedUrls.push(gifDataUrl)
+          }
         } else {
-          // Fallback to dataUrl if server returned an issue
-          newUploadedUrls.push(webpResult.dataUrl)
+          setUploadProgressText(`${i + 1} / ${filesToProcess.length}: "${file.name}" зургийг WebP руу хөрвүүлж байна...`)
+
+          // Convert to WebP in browser canvas for non-GIF images
+          const webpResult = await convertImageFileToWebP(file, {
+            maxWidth: 1600,
+            maxHeight: 1600,
+            quality: 0.85,
+          })
+
+          // Upload to server endpoint
+          const formData = new FormData()
+          formData.append('file', webpResult.file)
+          formData.append('passcode', activePasscode)
+
+          const res = await fetch('/api/admin/upload-image', {
+            method: 'POST',
+            headers: {
+              'x-admin-passcode': activePasscode,
+            },
+            body: formData,
+          })
+
+          const data = await res.json()
+          if (res.ok && data.url) {
+            newUploadedUrls.push(data.url)
+          } else {
+            // Fallback to dataUrl if server returned an issue
+            newUploadedUrls.push(webpResult.dataUrl)
+          }
         }
       }
 
@@ -770,13 +804,19 @@ export default function AdminPage() {
         .map((f) => (typeof f === 'string' ? f.trim() : ''))
         .filter((f) => f.length > 0)
 
+      const isFree = Boolean(
+        editingProduct.isFree ||
+        (Number(editingProduct.priceMNT || 0) === 0 && Number(editingProduct.priceUSD || 0) === 0)
+      )
+
       const payload = {
         ...editingProduct,
         title: (editingProduct.title || '').trim(),
         category: (editingProduct.category || 'sfx').trim(),
-        priceMNT: Math.round(Number(editingProduct.priceMNT) || 0),
+        isFree,
+        priceMNT: isFree ? 0 : Math.round(Number(editingProduct.priceMNT) || 0),
         originalPriceMNT: Math.round(Number(editingProduct.originalPriceMNT) || 0),
-        priceUSD: Number(editingProduct.priceUSD) || 0,
+        priceUSD: isFree ? 0 : (Number(editingProduct.priceUSD) || 0),
         originalPriceUSD: Number(editingProduct.originalPriceUSD) || 0,
         image: currentImgs[0] || '/images/product-morph-3d.png',
         images: currentImgs,
@@ -1376,7 +1416,7 @@ export default function AdminPage() {
                           <td className="py-3 px-3">
                             <div className="flex items-center gap-2.5">
                               <div className="relative w-11 h-8 rounded bg-zinc-100 overflow-hidden border border-zinc-200 shrink-0">
-                                <Image src={p.image} alt={p.title} fill className="object-cover" />
+                                <SafeProductImage src={p.image} alt={p.title} fill className="object-cover" />
                               </div>
                               <div className="min-w-0">
                                 <div className="font-bold text-zinc-900 truncate max-w-[200px]">
@@ -1401,8 +1441,20 @@ export default function AdminPage() {
                           </td>
 
                           <td className="py-3 px-3 font-mono">
-                            <div className="font-bold text-zinc-900">{p.priceMNT.toLocaleString()}₮</div>
-                            <div className="text-[10px] text-zinc-400">${p.priceUSD.toFixed(2)}</div>
+                            {p.isFree || (p.priceMNT === 0 && p.priceUSD === 0) ? (
+                              <div>
+                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                                  <Gift className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span>ҮНЭГҮЙ (0₮)</span>
+                                </span>
+                                <div className="text-[10px] text-emerald-600 font-semibold">$0.00</div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="font-bold text-zinc-900">{p.priceMNT.toLocaleString()}₮</div>
+                                <div className="text-[10px] text-zinc-400">${p.priceUSD.toFixed(2)}</div>
+                              </>
+                            )}
                           </td>
 
                           <td className="py-3 px-3 text-[11px] text-zinc-600">
@@ -2768,6 +2820,75 @@ export default function AdminPage() {
                 </p>
               </div>
 
+              {/* Free Product Toggle Banner */}
+              <div className={`p-3 rounded-xl border transition-all ${
+                editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+                  ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20'
+                  : 'bg-[#FAFAFA] border-[#E6E6E3]'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-zinc-200 text-zinc-600'
+                    }`}>
+                      <Gift className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[12px] font-bold text-zinc-900">
+                          Үнэгүй бүтээгдэхүүн (Free / 0₮)
+                        </span>
+                        {(editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)) && (
+                          <span className="text-[9px] font-bold bg-emerald-600 text-white px-1.5 py-0.2 rounded-full">
+                            ИДЭВХЖСЭН
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 mt-0.5">
+                        Энэ тохиргоог асаавал үнэ нь 0₮ болж, хэрэглэгчдэд банк/гүйлгээний form бөглүүлэхгүй шууд баталгаажиж татах холбоос өгнө.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const isCurrentlyFree = editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+                      if (isCurrentlyFree) {
+                        setEditingProduct({
+                          ...editingProduct,
+                          isFree: false,
+                          priceMNT: 29900,
+                          originalPriceMNT: editingProduct.originalPriceMNT || 89000,
+                          priceUSD: 9.99,
+                          originalPriceUSD: editingProduct.originalPriceUSD || 29.0,
+                          badge: editingProduct.badge === 'ҮНЭГҮЙ' ? '' : editingProduct.badge,
+                        })
+                      } else {
+                        setEditingProduct({
+                          ...editingProduct,
+                          isFree: true,
+                          priceMNT: 0,
+                          priceUSD: 0,
+                          badge: editingProduct.badge || 'ҮНЭГҮЙ',
+                        })
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
+                      editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                        : 'bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-700'
+                    }`}
+                  >
+                    {editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+                      ? '✓ Үнэгүй болгосон'
+                      : 'Үнэгүй болгох (0₮)'}
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Ангилал</label>
@@ -2805,18 +2926,27 @@ export default function AdminPage() {
                     type="text"
                     value={editingProduct.badge || ''}
                     onChange={(e) => setEditingProduct({ ...editingProduct, badge: e.target.value })}
-                    placeholder="HOT / 85% OFF"
+                    placeholder="HOT / 85% OFF / ҮНЭГҮЙ"
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Үнэ ₮ (MNT) *</label>
+                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                    Үнэ ₮ (MNT) {editingProduct.isFree || editingProduct.priceMNT === 0 ? '(Үнэгүй)' : '*'}
+                  </label>
                   <input
                     type="number"
-                    required
-                    value={editingProduct.priceMNT || ''}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, priceMNT: Number(e.target.value) })}
+                    min={0}
+                    value={editingProduct.priceMNT !== undefined && editingProduct.priceMNT !== null ? editingProduct.priceMNT : ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setEditingProduct({
+                        ...editingProduct,
+                        priceMNT: val,
+                        isFree: val === 0 && (editingProduct.priceUSD === 0 || !editingProduct.priceUSD),
+                      })
+                    }}
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
                   />
                 </div>
@@ -2825,6 +2955,7 @@ export default function AdminPage() {
                   <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Хуучин үнэ ₮</label>
                   <input
                     type="number"
+                    min={0}
                     value={editingProduct.originalPriceMNT || ''}
                     onChange={(e) => setEditingProduct({ ...editingProduct, originalPriceMNT: Number(e.target.value) })}
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
@@ -2838,8 +2969,16 @@ export default function AdminPage() {
                   <input
                     type="number"
                     step="0.01"
-                    value={editingProduct.priceUSD || ''}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, priceUSD: Number(e.target.value) })}
+                    min={0}
+                    value={editingProduct.priceUSD !== undefined && editingProduct.priceUSD !== null ? editingProduct.priceUSD : ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setEditingProduct({
+                        ...editingProduct,
+                        priceUSD: val,
+                        isFree: val === 0 && (editingProduct.priceMNT === 0 || !editingProduct.priceMNT),
+                      })
+                    }}
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
                   />
                 </div>
@@ -2849,6 +2988,7 @@ export default function AdminPage() {
                   <input
                     type="number"
                     step="0.01"
+                    min={0}
                     value={editingProduct.originalPriceUSD || ''}
                     onChange={(e) => setEditingProduct({ ...editingProduct, originalPriceUSD: Number(e.target.value) })}
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
@@ -3072,10 +3212,10 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-800 flex items-center gap-1.5">
                       <ImageIcon className="w-3.5 h-3.5 text-[#0088CC]" />
-                      <span>Бүтээгдэхүүний зургууд & Collage (Дээд тал нь 6 зураг)</span>
+                      <span>Бүтээгдэхүүний зургууд &amp; GIF Cover (Дээд тал нь 6 зураг)</span>
                     </label>
                     <p className="text-[10px] text-zinc-500 mt-0.5">
-                      Компьютерээсээ зураг оруулахад автоматаар <strong>.webp</strong> формат руу шахагдаж хөрвөнө. Олон зураг оруулбал дэлгүүр дээр <strong>Collage</strong> хэлбэрээр харагдана.
+                      Компьютерээсээ зураг оруулах боломжтой (<strong>PNG, JPG, WEBP</strong> болон <strong>хөдөлгөөнт GIF</strong> бүрэн дэмжинэ). Эхний зураг нь бүтээгдэхүүний <strong>үндсэн cover зураг</strong> болно.
                     </p>
                   </div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold shrink-0">
@@ -3093,15 +3233,15 @@ export default function AdminPage() {
                     <Upload className="w-4 h-4 shrink-0" />
                     <span>
                       {uploadingProductImages
-                        ? uploadProgressText || 'WebP руу хөрвүүлж байна...'
+                        ? uploadProgressText || 'Зургийг хуулж байна...'
                         : (editingProduct.images?.length || 0) >= 6
                         ? 'Зургийн дээд хязгаар (6/6) дүүрсэн'
-                        : '+ Зураг оруулах (PNG/JPG/WEBP - Автомат WebP хөрвүүлэлт)'}
+                        : '+ Зураг оруулах (PNG / JPG / WEBP / GIF хөдөлгөөнт зураг)'}
                     </span>
                     <input
                       type="file"
                       multiple
-                      accept="image/*"
+                      accept="image/*,.gif"
                       disabled={uploadingProductImages || (editingProduct.images?.length || 0) >= 6}
                       onChange={handleUploadProductImages}
                       className="hidden"
@@ -3121,33 +3261,40 @@ export default function AdminPage() {
                 {editingProduct.images && editingProduct.images.length > 0 && (
                   <div className="space-y-2">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                      {editingProduct.images.map((imgUrl, idx) => (
-                        <div
-                          key={idx}
-                          className={`relative group rounded-lg overflow-hidden border-2 bg-white flex flex-col justify-between ${
-                            idx === 0
-                              ? 'border-[#0088CC] ring-2 ring-[#0088CC]/20 shadow-xs'
-                              : 'border-zinc-200 hover:border-zinc-400'
-                          }`}
-                        >
-                          <div className="relative aspect-square w-full bg-zinc-100">
-                            <SafeProductImage
-                              src={imgUrl}
-                              alt={`Зураг ${idx + 1}`}
-                              fill
-                              sizes="120px"
-                              className="object-cover"
-                            />
-                            {idx === 0 && (
-                              <div className="absolute top-1 left-1 bg-[#0088CC] text-white text-[8px] font-bold px-1.5 py-0.2 rounded shadow-xs flex items-center gap-0.5">
-                                <Star className="w-2.5 h-2.5 fill-current" />
-                                <span>ҮНДСЭН</span>
+                      {editingProduct.images.map((imgUrl, idx) => {
+                        const isImgGif = imgUrl.toLowerCase().includes('.gif') || imgUrl.startsWith('data:image/gif')
+                        return (
+                          <div
+                            key={idx}
+                            className={`relative group rounded-lg overflow-hidden border-2 bg-white flex flex-col justify-between ${
+                              idx === 0
+                                ? 'border-[#0088CC] ring-2 ring-[#0088CC]/20 shadow-xs'
+                                : 'border-zinc-200 hover:border-zinc-400'
+                            }`}
+                          >
+                            <div className="relative aspect-square w-full bg-zinc-100">
+                              <SafeProductImage
+                                src={imgUrl}
+                                alt={`Зураг ${idx + 1}`}
+                                fill
+                                sizes="120px"
+                                className="object-cover"
+                              />
+                              {idx === 0 && (
+                                <div className="absolute top-1 left-1 bg-[#0088CC] text-white text-[8px] font-bold px-1.5 py-0.2 rounded shadow-xs flex items-center gap-0.5">
+                                  <Star className="w-2.5 h-2.5 fill-current" />
+                                  <span>ҮНДСЭН COVER</span>
+                                </div>
+                              )}
+                              {isImgGif && (
+                                <div className="absolute bottom-1 left-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[8px] font-black px-1.5 py-0.2 rounded shadow-xs">
+                                  GIF
+                                </div>
+                              )}
+                              <div className="absolute top-1 right-1 bg-black/70 text-white text-[8px] font-mono px-1 py-0.2 rounded">
+                                #{idx + 1}
                               </div>
-                            )}
-                            <div className="absolute top-1 right-1 bg-black/70 text-white text-[8px] font-mono px-1 py-0.2 rounded">
-                              #{idx + 1}
                             </div>
-                          </div>
 
                           {/* Quick Controls */}
                           <div className="p-1 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between text-[10px]">
@@ -3196,8 +3343,9 @@ export default function AdminPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    })}
+                  </div>
 
                     {/* Live Collage Preview */}
                     <div className="mt-3 p-3 bg-white rounded-xl border border-zinc-200">

@@ -159,19 +159,41 @@ export async function editTelegramMessageText(params: {
  * Format an order notification text in HTML for Telegram
  */
 export function formatOrderNotificationText(order: Order, siteUrl: string = 'https://shop.soniq.click'): string {
+  const isFree =
+    (Number(order.totalAmountMNT || 0) === 0 && Number(order.totalAmountUSD || 0) === 0) ||
+    order.paymentMethod === 'FREE_DOWNLOAD'
+
   const itemsText = (order.items || [])
-    .map((item) => `  • <b>${escapeHtml(item.title)}</b> (${item.price ? Number(item.price).toLocaleString() + '₮' : ''})`)
+    .map((item) => `  • <b>${escapeHtml(item.title)}</b> (${isFree ? 'ҮНЭГҮЙ' : item.price ? Number(item.price).toLocaleString() + '₮' : ''})`)
     .join('\n')
 
-  const totalFormatted =
-    order.currency === 'USD'
-      ? `$${(order.totalAmountUSD || 0).toFixed(2)}`
-      : `${(order.totalAmountMNT || 0).toLocaleString()}₮`
+  const totalFormatted = isFree
+    ? '🎁 ҮНЭГҮЙ (0₮)'
+    : order.currency === 'USD'
+    ? `$${(order.totalAmountUSD || 0).toFixed(2)}`
+    : `${(order.totalAmountMNT || 0).toLocaleString()}₮`
 
   const dateStr = new Date(order.createdAt || Date.now()).toLocaleString('mn-MN', {
     timeZone: 'Asia/Ulaanbaatar',
     hour12: false,
   })
+
+  if (isFree) {
+    return `🎁 <b>ҮНЭГҮЙ БҮТЭЭГДЭХҮҮН ТАТАЖ АВЛАА!</b>
+━━━━━━━━━━━━━━━━━━━━
+📦 <b>Захиалга:</b> <code>${escapeHtml(order.id)}</code>
+📅 <b>Огноо:</b> ${escapeHtml(dateStr)}
+
+👤 <b>Хэрэглэгч:</b> ${escapeHtml(order.customerName || 'Зочин')}
+📧 <b>Gmail / И-мэйл:</b> <code>${escapeHtml(order.customerEmail)}</code>
+${order.customerPhone && order.customerPhone !== 'Үнэгүй таталт' ? `📞 <b>Утас:</b> <code>${escapeHtml(order.customerPhone)}</code>\n` : ''}
+💰 <b>Төлбөр:</b> <b>ҮНЭГҮЙ (0₮)</b>
+🔓 <b>Татах эрх:</b> Шууд баталгаажсан (Идэвхтэй ✓)
+🛒 <b>Татаж авсан бүтээгдэхүүн:</b>
+${itemsText || '  • Үнэгүй багц'}
+━━━━━━━━━━━━━━━━━━━━
+👉 Доорх товчоор захиалгын хуудсыг харна уу:`
+  }
 
   return `🔔 <b>ШИНЭ ЗАХИАЛГА ИРЛЭЭ!</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -275,26 +297,45 @@ export async function sendTelegramOrderNotification(
     const approvalToken = generateOrderApprovalToken(order.id, secret)
     const text = formatOrderNotificationText(order, siteUrl)
 
-    const replyMarkup = {
-      inline_keyboard: [
-        [
-          {
-            text: '⚡ Шууд баталгаажуулах (1-Click Approve)',
-            url: `${siteUrl}/api/admin/orders/quick-approve?orderId=${encodeURIComponent(order.id)}&token=${approvalToken}`,
-          },
-        ],
-        [
-          {
-            text: '👤 Захиалга харах',
-            url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
-          },
-          {
-            text: '⚙️ Админ самбар',
-            url: `${siteUrl}/admin`,
-          },
-        ],
-      ],
-    }
+    const isFree =
+      (Number(order.totalAmountMNT || 0) === 0 && Number(order.totalAmountUSD || 0) === 0) ||
+      order.paymentMethod === 'FREE_DOWNLOAD'
+
+    const replyMarkup = isFree
+      ? {
+          inline_keyboard: [
+            [
+              {
+                text: '👁 Хэрэглэгчийн татах хуудас',
+                url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
+              },
+              {
+                text: '⚙️ Админ самбар',
+                url: `${siteUrl}/admin`,
+              },
+            ],
+          ],
+        }
+      : {
+          inline_keyboard: [
+            [
+              {
+                text: '⚡ Шууд баталгаажуулах (1-Click Approve)',
+                url: `${siteUrl}/api/admin/orders/quick-approve?orderId=${encodeURIComponent(order.id)}&token=${approvalToken}`,
+              },
+            ],
+            [
+              {
+                text: '👤 Захиалга харах',
+                url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
+              },
+              {
+                text: '⚙️ Админ самбар',
+                url: `${siteUrl}/admin`,
+              },
+            ],
+          ],
+        }
 
     return await sendTelegramMessage({
       botToken,

@@ -16,6 +16,7 @@ import {
   Music2,
   Palette,
   AlertTriangle,
+  Gift,
 } from 'lucide-react'
 import { STORE_PRODUCTS, ULTIMATE_BUNDLE, StoreProduct } from '@/lib/store-data'
 import { StoreProvider, useStore } from '@/lib/store-context'
@@ -253,34 +254,59 @@ function ProductDetailContent({ slug }: { slug: string }) {
 
               {/* Price & Checkout Actions */}
               <div className="pt-3 border-t border-[#E6E6E3]">
-                <div className="flex items-baseline gap-2 mb-3">
-                  <span className="text-2xl sm:text-3xl font-black text-[#141414] tracking-tight">
-                    {formatPrice(product.priceMNT, product.priceUSD)}
-                  </span>
-                  <span className="text-xs text-zinc-400 line-through font-mono">
-                    {formatPrice(product.originalPriceMNT, product.originalPriceUSD)}
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                    Нэг удаа төлнө · Насан туршийн эрх
-                  </span>
-                </div>
+                {product.isFree || (product.priceMNT === 0 && product.priceUSD === 0) ? (
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight flex items-center gap-2">
+                      <Gift className="w-6 h-6 text-emerald-600" />
+                      <span>ҮНЭГҮЙ (0₮)</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                      🎁 100% Үнэгүй татах эрхтэй
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <span className="text-2xl sm:text-3xl font-black text-[#141414] tracking-tight">
+                      {formatPrice(product.priceMNT, product.priceUSD)}
+                    </span>
+                    <span className="text-xs text-zinc-400 line-through font-mono">
+                      {formatPrice(product.originalPriceMNT, product.originalPriceUSD)}
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                      Нэг удаа төлнө · Насан туршийн эрх
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={() => openCheckoutWithProduct(product)}
-                    className="py-2.5 px-5 rounded-full bg-[#141414] hover:bg-black text-white font-semibold text-xs tracking-wide transition-all shadow-xs hover:shadow-md cursor-pointer flex items-center gap-1.5"
-                  >
-                    <span>Шууд авах</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+                  {product.isFree || (product.priceMNT === 0 && product.priceUSD === 0) ? (
+                    <button
+                      onClick={() => openCheckoutWithProduct(product)}
+                      className="py-3 px-6 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs tracking-wide transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Үнэгүй шууд татах</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => openCheckoutWithProduct(product)}
+                        className="py-2.5 px-5 rounded-full bg-[#141414] hover:bg-black text-white font-semibold text-xs tracking-wide transition-all shadow-xs hover:shadow-md cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>Шууд авах</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
 
-                  <button
-                    onClick={() => addToCart(product, true)}
-                    className="py-2.5 px-4 rounded-full bg-white hover:bg-zinc-50 border border-[#E6E6E3] text-zinc-800 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
-                  >
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    <span>Сагслах</span>
-                  </button>
+                      <button
+                        onClick={() => addToCart(product, true)}
+                        className="py-2.5 px-4 rounded-full bg-white hover:bg-zinc-50 border border-[#E6E6E3] text-zinc-800 font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        <span>Сагслах</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import Image from 'next/image'
+import { SafeProductImage } from '@/components/store/safe-image'
 import {
   Film,
   Maximize2,
@@ -70,7 +70,7 @@ export function StoreProductCollage({
   if (allImages.length <= 1) {
     return (
       <div className={`relative w-full aspect-[16/10] sm:aspect-[4/3] rounded-xl overflow-hidden border border-[#E6E6E3] bg-zinc-100 group shadow-xs ${className}`}>
-        <Image
+        <SafeProductImage
           src={allImages[0]}
           alt={title}
           fill
@@ -165,7 +165,7 @@ export function StoreProductCollage({
                 : 'border-zinc-200 hover:border-zinc-400 opacity-75 hover:opacity-100'
             }`}
           >
-            <Image
+            <SafeProductImage
               src={img}
               alt={`${title} - зураг ${idx + 1}`}
               fill
@@ -218,7 +218,7 @@ export function StoreProductCollage({
           className="relative max-w-5xl max-h-[80vh] w-full h-[70vh] flex items-center justify-center"
         >
           <div className="relative w-full h-full">
-            <Image
+            <SafeProductImage
               src={allImages[lightboxIndex]}
               alt={`${title} - зураг ${lightboxIndex + 1}`}
               fill
@@ -267,7 +267,7 @@ export function StoreProductCollage({
                     : 'border-white/20 opacity-60 hover:opacity-100'
                 }`}
               >
-                <Image
+                <SafeProductImage
                   src={img}
                   alt={`Thumbnail ${idx + 1}`}
                   fill
@@ -302,7 +302,7 @@ export function renderCollageGrid(
         onMouseEnter={() => onHover(0)}
         className="relative w-full h-full aspect-[16/10] sm:aspect-[4/3] overflow-hidden group cursor-pointer bg-zinc-100"
       >
-        <Image
+        <SafeProductImage
           src={single}
           alt="Product image"
           fill
@@ -324,7 +324,7 @@ export function renderCollageGrid(
             onMouseEnter={() => onHover(idx)}
             className="relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
           >
-            <Image
+            <SafeProductImage
               src={img}
               alt={`Collage ${idx + 1}`}
               fill
@@ -347,7 +347,7 @@ export function renderCollageGrid(
           onMouseEnter={() => onHover(0)}
           className="col-span-8 relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
         >
-          <Image
+          <SafeProductImage
             src={images[0]}
             alt="Collage 1"
             fill
@@ -364,7 +364,7 @@ export function renderCollageGrid(
               onMouseEnter={() => onHover(idx + 1)}
               className="relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
             >
-              <Image
+              <SafeProductImage
                 src={img}
                 alt={`Collage ${idx + 2}`}
                 fill
@@ -388,7 +388,7 @@ export function renderCollageGrid(
           onMouseEnter={() => onHover(0)}
           className="col-span-7 relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
         >
-          <Image
+          <SafeProductImage
             src={images[0]}
             alt="Collage 1"
             fill
@@ -405,7 +405,7 @@ export function renderCollageGrid(
               onMouseEnter={() => onHover(idx + 1)}
               className="relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
             >
-              <Image
+              <SafeProductImage
                 src={img}
                 alt={`Collage ${idx + 2}`}
                 fill
@@ -429,7 +429,7 @@ export function renderCollageGrid(
           onMouseEnter={() => onHover(0)}
           className="col-span-7 relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
         >
-          <Image
+          <SafeProductImage
             src={images[0]}
             alt="Collage 1"
             fill
@@ -446,7 +446,7 @@ export function renderCollageGrid(
               onMouseEnter={() => onHover(idx + 1)}
               className="relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
             >
-              <Image
+              <SafeProductImage
                 src={img}
                 alt={`Collage ${idx + 2}`}
                 fill
@@ -469,7 +469,7 @@ export function renderCollageGrid(
         onMouseEnter={() => onHover(0)}
         className="col-span-7 relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
       >
-        <Image
+        <SafeProductImage
           src={images[0]}
           alt="Collage 1"
           fill
@@ -486,7 +486,7 @@ export function renderCollageGrid(
             onMouseEnter={() => onHover(idx + 1)}
             className="relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
           >
-            <Image
+            <SafeProductImage
               src={img}
               alt={`Collage ${idx + 2}`}
               fill
@@ -503,7 +503,7 @@ export function renderCollageGrid(
             onMouseEnter={() => onHover(5)}
             className="col-span-2 relative h-full overflow-hidden group cursor-pointer bg-zinc-100"
           >
-            <Image
+            <SafeProductImage
               src={images[5]}
               alt="Collage 6"
               fill

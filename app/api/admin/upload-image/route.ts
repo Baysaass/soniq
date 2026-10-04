@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
     let passcode = req.headers.get('x-admin-passcode') || ''
     let buffer: Buffer | null = null
     let filename = `product-${Date.now()}.webp`
+    let isGif = false
+    let mimeType = 'image/webp'
     let dataUrl = ''
 
     if (contentType.includes('multipart/form-data')) {
@@ -25,9 +27,15 @@ export async function POST(req: NextRequest) {
       }
       const arrayBuffer = await file.arrayBuffer()
       buffer = Buffer.from(arrayBuffer)
+      isGif = file.type === 'image/gif' || (Boolean(file.name) && file.name.toLowerCase().endsWith('.gif'))
+      mimeType = isGif ? 'image/gif' : 'image/webp'
+      const ext = isGif ? '.gif' : '.webp'
+
       if (file.name) {
         const clean = file.name.replace(/[^a-zA-Z0-9_.-]/g, '-')
-        filename = clean.endsWith('.webp') ? clean : `${clean}.webp`
+        filename = clean.toLowerCase().endsWith(ext) ? clean : `${clean}${ext}`
+      } else {
+        filename = `product-${Date.now()}${ext}`
       }
     } else {
       const body = await req.json()
@@ -35,6 +43,8 @@ export async function POST(req: NextRequest) {
       if (body.filename) filename = body.filename
       if (body.dataUrl) {
         dataUrl = body.dataUrl
+        isGif = body.dataUrl.startsWith('data:image/gif') || (Boolean(body.filename) && body.filename.toLowerCase().endsWith('.gif'))
+        mimeType = isGif ? 'image/gif' : 'image/webp'
         const base64Data = body.dataUrl.replace(/^data:image\/\w+;base64,/, '')
         buffer = Buffer.from(base64Data, 'base64')
       }
@@ -62,7 +72,7 @@ export async function POST(req: NextRequest) {
             Bucket: r2Cfg.bucketName,
             Key: objectKey,
             Body: buffer,
-            ContentType: 'image/webp',
+            ContentType: mimeType,
             CacheControl: 'public, max-age=31536000, immutable',
           })
         )
@@ -95,7 +105,7 @@ export async function POST(req: NextRequest) {
         let { error: uploadErr } = await supabase.storage
           .from(bucket)
           .upload(filename, buffer, {
-            contentType: 'image/webp',
+            contentType: mimeType,
             cacheControl: '31536000',
             upsert: true,
           })
@@ -106,7 +116,7 @@ export async function POST(req: NextRequest) {
           const retry = await supabase.storage
             .from(bucket)
             .upload(filename, buffer, {
-              contentType: 'image/webp',
+              contentType: mimeType,
               cacheControl: '31536000',
               upsert: true,
             })
@@ -155,8 +165,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. In serverless / read-only filesystem environments, return optimized WebP DataURL
-    const returnDataUrl = dataUrl || `data:image/webp;base64,${buffer.toString('base64')}`
+    // 4. In serverless / read-only filesystem environments, return optimized DataURL
+    const returnDataUrl = dataUrl || `data:${mimeType};base64,${buffer.toString('base64')}`
     return NextResponse.json({
       success: true,
       url: returnDataUrl,

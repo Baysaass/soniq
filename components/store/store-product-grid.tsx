@@ -11,6 +11,9 @@ import {
   ExternalLink,
   Film,
   Layers,
+  Gift,
+  Download,
+  Sparkles,
 } from 'lucide-react'
 import { STORE_PRODUCTS, DEFAULT_STORE_CATEGORIES, StoreCategory } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
@@ -243,11 +246,16 @@ export function StoreProductGrid() {
                     </Link>
 
                     <div className="absolute top-2 left-2 flex items-center gap-1 flex-wrap">
-                      {product.badge && (
+                      {(product.isFree || (product.priceMNT === 0 && product.priceUSD === 0)) ? (
+                        <div className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1 animate-pulse">
+                          <Gift className="w-2.5 h-2.5" />
+                          <span>ҮНЭГҮЙ</span>
+                        </div>
+                      ) : product.badge ? (
                         <div className="bg-[#141414]/90 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full">
                           {product.badge}
                         </div>
-                      )}
+                      ) : null}
                       {product.sampleVideoUrl && (
                         <div className="bg-red-600/90 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-0.5" title="Sample видео үзэх">
                           <Film className="w-2.5 h-2.5" />
@@ -296,44 +304,66 @@ export function StoreProductGrid() {
 
                 {/* Price & Actions */}
                 <div className="mt-3 pt-2.5 border-t border-[#E6E6E3]">
-                  <div className="flex items-baseline justify-between mb-2">
-                    <span className="font-extrabold text-[13px] text-[#141414]">
-                      {formatPrice(product.priceMNT, product.priceUSD)}
-                    </span>
-                    <span className="text-[10px] text-zinc-400 line-through font-mono">
-                      {formatPrice(product.originalPriceMNT, product.originalPriceUSD)}
-                    </span>
-                  </div>
+                  {product.isFree || (product.priceMNT === 0 && product.priceUSD === 0) ? (
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="font-black text-[13px] text-emerald-600 flex items-center gap-1">
+                        <Gift className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>ҮНЭГҮЙ (0₮)</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                        100% Free
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="font-extrabold text-[13px] text-[#141414]">
+                        {formatPrice(product.priceMNT, product.priceUSD)}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 line-through font-mono">
+                        {formatPrice(product.originalPriceMNT, product.originalPriceUSD)}
+                      </span>
+                    </div>
+                  )}
 
-                  <div className="grid grid-cols-2 gap-1.5">
+                  {product.isFree || (product.priceMNT === 0 && product.priceUSD === 0) ? (
                     <button
                       onClick={() => openCheckoutWithProduct(product)}
-                      className="py-1.5 px-2 rounded-lg bg-[#141414] hover:bg-black text-white text-[11px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1"
+                      className="w-full py-1.8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-all shadow-xs hover:shadow-md cursor-pointer flex items-center justify-center gap-1.5"
                     >
-                      <span>Шууд авах</span>
+                      <Download className="w-3.5 h-3.5" />
+                      <span>Үнэгүй татах</span>
                     </button>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        onClick={() => openCheckoutWithProduct(product)}
+                        className="py-1.5 px-2 rounded-lg bg-[#141414] hover:bg-black text-white text-[11px] font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        <span>Шууд авах</span>
+                      </button>
 
-                    <button
-                      onClick={() => addToCart(product, true)}
-                      className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-colors border cursor-pointer flex items-center justify-center gap-1 ${
-                        inCart
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-[#F7F7F5] hover:bg-zinc-200/70 text-zinc-800 border-[#E6E6E3]'
-                      }`}
-                    >
-                      {inCart ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-600" />
-                          <span>Нэмэгдсэн</span>
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="w-3 h-3" />
-                          <span>Сагслах</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => addToCart(product, true)}
+                        className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-colors border cursor-pointer flex items-center justify-center gap-1 ${
+                          inCart
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-[#F7F7F5] hover:bg-zinc-200/70 text-zinc-800 border-[#E6E6E3]'
+                        }`}
+                      >
+                        {inCart ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>Нэмэгдсэн</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="w-3 h-3" />
+                            <span>Сагслах</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
 
                   <Link
                     href={`/shop/product/${product.slug}`}

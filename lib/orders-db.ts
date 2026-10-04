@@ -26,7 +26,7 @@ export interface Order {
   totalAmountUSD: number
   currency: 'MNT' | 'USD'
   status: OrderStatus
-  paymentMethod: 'KHAN_BANK' | 'GOLOMT_BANK' | 'QPAY'
+  paymentMethod: 'KHAN_BANK' | 'GOLOMT_BANK' | 'QPAY' | 'FREE_DOWNLOAD' | string
   transferReference: string
   receiptNote?: string
   weTransferLink: string
