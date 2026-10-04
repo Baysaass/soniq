@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendOrderApprovedEmail } from '@/lib/email-service'
+import { sendTelegramOrderApprovedNotification } from '@/lib/telegram'
 
 export async function POST(request: Request) {
   try {
@@ -44,6 +45,11 @@ export async function POST(request: Request) {
           ? ' И-мэйл захиалагч руу амжилттай илгээгдлээ.'
           : ` Гэвч и-мэйл илгээгдсэнгүй: ${emailResult.error}`
         : ''
+
+      // Also dispatch Telegram confirmation notification!
+      sendTelegramOrderApprovedNotification(updated, emailSuccess, siteUrl).catch((tgErr) => {
+        console.warn('Telegram approval alert warning:', tgErr)
+      })
 
       return NextResponse.json({
         success: true,

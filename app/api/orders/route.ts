@@ -75,13 +75,14 @@ export async function POST(request: Request) {
       r2Key: orderR2Key,
     })
 
-    // Dispatch Telegram notification (non-blocking)
-    sendTelegramOrderNotification(order).catch((err) => {
+    const siteUrl = new URL(request.url).origin
+
+    // Dispatch Telegram notification (non-blocking) with 1-Click Approve button
+    sendTelegramOrderNotification(order, siteUrl).catch((err) => {
       console.warn('Telegram notification background warning:', err)
     })
 
     // Dispatch Customer Order Confirmation Email (non-blocking)
-    const siteUrl = new URL(request.url).origin
     sendOrderCreatedEmail({ order, siteUrl }).catch((err) => {
       console.warn('Order confirmation email background warning:', err)
     })

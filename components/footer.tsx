@@ -1,11 +1,20 @@
 'use client'
 
+import Link from 'next/link'
 import { useLang } from '@/lib/i18n'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
 import SplitText from '@/components/animations/split-text'
 import FadeUp from '@/components/animations/fade-up'
 
-export function Footer({ onGetClick }: { onGetClick: (plan: 'starter' | 'full', e?: React.MouseEvent) => void }) {
+export function Footer({
+  onGetClick,
+  starterHref = '/shop?plan=starter',
+  fullHref = '/shop?plan=full',
+}: {
+  onGetClick?: (plan: 'starter' | 'full', e?: React.MouseEvent) => void
+  starterHref?: string
+  fullHref?: string
+}) {
   const { t, lang } = useLang()
 
   return (
@@ -33,18 +42,24 @@ export function Footer({ onGetClick }: { onGetClick: (plan: 'starter' | 'full', 
           <FadeUp y={20}>
             <p className="text-base text-muted-foreground mb-8">{t('footer_sub') as string}</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button
-                onClick={(e) => onGetClick('starter', e)}
+              <Link
+                href={starterHref}
+                onClick={(e) => {
+                  if (onGetClick) onGetClick('starter', e)
+                }}
                 className="inline-flex items-center px-6 py-2.5 bg-white text-foreground text-sm font-semibold rounded-full border border-border hover:border-brand/40 hover:shadow-md transition-all cursor-pointer"
               >
                 Starter — {t('pkg_starter_price')}
-              </button>
-              <button
-                onClick={(e) => onGetClick('full', e)}
+              </Link>
+              <Link
+                href={fullHref}
+                onClick={(e) => {
+                  if (onGetClick) onGetClick('full', e)
+                }}
                 className="inline-flex items-center px-6 py-2.5 bg-amber-400 text-white text-sm font-bold rounded-full shadow-md shadow-amber-500/20 hover:opacity-90 transition-all cursor-pointer"
               >
                 Full — {t('pkg_full_price')}
-              </button>
+              </Link>
             </div>
             <p className="text-xs text-muted-foreground mt-3">{t('footer_no_cc') as string}</p>
           </FadeUp>

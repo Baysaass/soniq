@@ -6,7 +6,13 @@ import { Menu, X } from 'lucide-react'
 import { useLang } from '@/lib/i18n'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
 
-export function Navbar({ onGetClick }: { onGetClick: (e: React.MouseEvent) => void }) {
+export function Navbar({
+  onGetClick,
+  getHref = '/shop?plan=full',
+}: {
+  onGetClick?: (e: React.MouseEvent) => void
+  getHref?: string
+}) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const { t } = useLang()
 
@@ -42,15 +48,15 @@ export function Navbar({ onGetClick }: { onGetClick: (e: React.MouseEvent) => vo
         {/* Right controls */}
         <div className="flex items-center gap-1.5">
           {/* CTA */}
-          <a
-            href="https://www.instagram.com/_baysaa_notfound/"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={onGetClick}
+          <Link
+            href={getHref}
+            onClick={(e) => {
+              if (onGetClick) onGetClick(e)
+            }}
             className="hidden sm:inline-flex items-center px-4 py-1.5 text-[13px] font-semibold bg-brand text-white rounded-full hover:opacity-90 transition-opacity duration-150 cursor-pointer"
           >
             {t('nav_get')}
-          </a>
+          </Link>
 
           {/* Mobile hamburger */}
           <button
@@ -86,18 +92,16 @@ export function Navbar({ onGetClick }: { onGetClick: (e: React.MouseEvent) => vo
             </Link>
           </nav>
           <div className="flex items-center justify-end mt-3 pt-3 border-t border-border">
-            <a
-              href="https://www.instagram.com/_baysaa_notfound/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-4 py-2 text-[13px] font-semibold bg-brand text-white rounded-full cursor-pointer"
+            <Link
+              href={getHref}
+              className="px-4 py-2 text-[13px] font-semibold bg-brand text-white rounded-full cursor-pointer text-center"
               onClick={(e) => {
                 setMobileOpen(false)
-                onGetClick(e)
+                if (onGetClick) onGetClick(e)
               }}
             >
               {t('nav_get')}
-            </a>
+            </Link>
           </div>
         </div>
       )}

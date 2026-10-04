@@ -90,25 +90,22 @@ export function PurchaseModal({ isOpen, selectedPlan, onClose }: PurchaseModalPr
 
             {/* Title */}
             <h3 className="text-lg md:text-xl font-bold text-white mb-3 tracking-tight">
-              Захиалга өгөх заавар
+              Захиалга өгөх
             </h3>
 
             {/* Message */}
             <p className="text-xs md:text-sm text-muted-foreground leading-relaxed mb-6 select-none font-medium text-pretty">
-              Вэбсайт дээрх онлайн төлбөр төлөлтийн систем хөгжүүлэгдэж байгаа тул та манай Instagram хаяг руу DM бичин{' '}
-              <span className="text-white font-semibold">Soniq {planLabel}</span> захиалгаа баталгаажуулна уу.
+              Манай дэлгүүрээс <span className="text-white font-semibold">Soniq {planLabel}</span> багцыг шууд онлайнаар сонгон захиалах боломжтой.
             </p>
 
             {/* Buttons */}
             <div className="flex flex-col items-center gap-2.5 w-full">
               <a
-                href="https://www.instagram.com/_baysaa_notfound/"
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/shop?plan=${selectedPlan}`}
                 onClick={onClose}
                 className={`w-full flex items-center justify-center gap-2 px-5 py-3 text-white text-sm font-bold rounded-xl hover:opacity-95 shadow-md transition-all cursor-pointer ${selectedPlan === 'full' ? 'bg-amber-500 shadow-amber-500/25' : 'bg-brand shadow-brand/25'}`}
               >
-                <span>Instagram руу шилжих</span>
+                <span>Дэлгүүрээс захиалах</span>
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
               <button

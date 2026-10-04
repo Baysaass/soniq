@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useRef, useState, useEffect, type RefObject } from 'react'
+import Link from 'next/link'
 import { motion, useScroll, useTransform, easeInOut, easeOut } from 'motion/react'
 import { useLang } from '@/lib/i18n'
 import { SoniqWordmark } from '@/components/logo'
@@ -78,7 +79,15 @@ function FloatingUploadIcons({
   )
 }
 
-export function Hero({ onGetClick }: { onGetClick: (plan: 'starter' | 'full', e?: React.MouseEvent) => void }) {
+export function Hero({
+  onGetClick,
+  starterHref = '/shop?plan=starter',
+  fullHref = '/shop?plan=full',
+}: {
+  onGetClick?: (plan: 'starter' | 'full', e?: React.MouseEvent) => void
+  starterHref?: string
+  fullHref?: string
+}) {
   const { t, lang } = useLang()
   const panelWrapRef = useRef<HTMLDivElement>(null)
   const [mounted, setMounted] = useState(false)
@@ -121,20 +130,26 @@ export function Hero({ onGetClick }: { onGetClick: (plan: 'starter' | 'full', e?
           <FadeUp y={16} delay={0.15} className="mt-10 w-full max-w-md">
             <div className="grid grid-cols-2 gap-3">
               {/* Starter */}
-              <button
-                onClick={(e) => onGetClick('starter', e)}
-                className="group relative flex flex-col items-center gap-1.5 px-4 py-5 rounded-2xl border border-border bg-white hover:border-brand/40 hover:shadow-md hover:shadow-brand/5 transition-all duration-200 cursor-pointer"
+              <Link
+                href={starterHref}
+                onClick={(e) => {
+                  if (onGetClick) onGetClick('starter', e)
+                }}
+                className="group relative flex flex-col items-center gap-1.5 px-4 py-5 rounded-2xl border border-border bg-white hover:border-brand/40 hover:shadow-md hover:shadow-brand/5 transition-all duration-200 cursor-pointer text-center"
               >
                 <span className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">{t('pkg_starter_name')}</span>
                 <span className="text-[26px] font-bold text-foreground tracking-tight leading-none">{t('pkg_starter_price')}</span>
                 <span className="text-[11px] font-semibold text-brand">{t('pkg_starter_sfx')}</span>
                 <span className="text-[10px] text-muted-foreground mt-1">{t('pkg_starter_desc')}</span>
-              </button>
+              </Link>
 
               {/* Full (recommended) */}
-              <button
-                onClick={(e) => onGetClick('full', e)}
-                className="group relative flex flex-col items-center gap-1.5 px-4 py-5 rounded-2xl border-2 border-amber-400/60 bg-gradient-to-b from-amber-50/80 to-white hover:border-amber-400 hover:shadow-md hover:shadow-amber-500/10 transition-all duration-200 cursor-pointer"
+              <Link
+                href={fullHref}
+                onClick={(e) => {
+                  if (onGetClick) onGetClick('full', e)
+                }}
+                className="group relative flex flex-col items-center gap-1.5 px-4 py-5 rounded-2xl border-2 border-amber-400/60 bg-gradient-to-b from-amber-50/80 to-white hover:border-amber-400 hover:shadow-md hover:shadow-amber-500/10 transition-all duration-200 cursor-pointer text-center"
               >
                 {/* Badge */}
                 <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-amber-400 text-[9px] font-bold text-white shadow-sm">
@@ -144,7 +159,7 @@ export function Hero({ onGetClick }: { onGetClick: (plan: 'starter' | 'full', e?
                 <span className="text-[26px] font-bold text-foreground tracking-tight leading-none">{t('pkg_full_price')}</span>
                 <span className="text-[11px] font-semibold text-amber-600">{t('pkg_full_sfx')}</span>
                 <span className="text-[10px] text-muted-foreground mt-1">{t('pkg_full_desc')}</span>
-              </button>
+              </Link>
             </div>
             <p className="text-[12px] text-muted-foreground/70 mt-3 text-center">{t('hero_note')}</p>
           </FadeUp>
