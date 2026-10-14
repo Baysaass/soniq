@@ -93,6 +93,16 @@ export async function POST(request: Request) {
         message: 'Захиалга цуцлагдлаа.',
         order: updated,
       })
+    } else if (action === 'REVERT_TO_PENDING') {
+      const updated = await db.revertOrderToPending(orderId, adminNotes)
+      if (!updated) {
+        return NextResponse.json({ error: 'Захиалга олдсонгүй' }, { status: 404 })
+      }
+      return NextResponse.json({
+        success: true,
+        message: 'Захиалга хүлээгдэж буй (PENDING) төлөвт шилжиж, татах эрх түгжигдлээ.',
+        order: updated,
+      })
     }
 
     return NextResponse.json({ error: 'Үйлдэл тодорхойгүй байна' }, { status: 400 })

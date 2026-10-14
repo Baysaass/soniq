@@ -322,7 +322,7 @@ export async function sendTelegramOrderNotification(
           inline_keyboard: [
             [
               {
-                text: '⚡ Шууд баталгаажуулах (1-Click Approve)',
+                text: '⚡ Данс шалгаж баталгаажуулах',
                 url: `${siteUrl}/api/admin/orders/quick-approve?orderId=${encodeURIComponent(order.id)}&token=${approvalToken}`,
               },
             ],
@@ -384,6 +384,8 @@ export async function sendTelegramOrderApprovedNotification(
       process.env.SITE_URL ||
       'https://shop.soniq.click'
 
+    const secret = botToken || settings?.adminPasscode || process.env.ADMIN_PASSCODE
+    const approvalToken = generateOrderApprovalToken(order.id, secret)
     const text = formatOrderApprovedNotificationText(order, emailSent, siteUrl)
 
     const replyMarkup = {
@@ -393,6 +395,12 @@ export async function sendTelegramOrderApprovedNotification(
             text: '👁 Хэрэглэгчийн татах хуудас',
             url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
           },
+          {
+            text: '🔒 Төлөв буцаах / Түгжих',
+            url: `${siteUrl}/api/admin/orders/quick-approve?orderId=${encodeURIComponent(order.id)}&token=${approvalToken}`,
+          },
+        ],
+        [
           {
             text: '⚙️ Админ самбар',
             url: `${siteUrl}/admin`,

@@ -337,6 +337,32 @@ export const db = {
     return localDB.updateOrder(id, updates)
   },
 
+  async revertOrderToPending(id: string, reason?: string): Promise<Order | null> {
+    invalidateOrdersCache()
+    const updates: Partial<Order> = {
+      status: 'PENDING',
+      approvedAt: null as any,
+      adminNotes: reason || 'Админ хүлээгдэж буй (PENDING) төлөвт буцаав (Данс шалгах)',
+    }
+
+    const provider = getActiveDBProvider()
+    if (provider === 'supabase') {
+      try {
+        return await supabaseDB.updateOrder(id, updates)
+      } catch (err) {
+        return localDB.updateOrder(id, updates)
+      }
+    }
+    if (provider === 'postgres') {
+      try {
+        return await postgresDB.updateOrder(id, updates)
+      } catch (err) {
+        return localDB.updateOrder(id, updates)
+      }
+    }
+    return localDB.updateOrder(id, updates)
+  },
+
   async getSettings(): Promise<StoreSettingsType> {
     const provider = getActiveDBProvider()
     if (provider === 'supabase') {

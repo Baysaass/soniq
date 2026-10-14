@@ -1069,6 +1069,30 @@ export default function AdminPage() {
     }
   }
 
+  const handleRevertToPending = async (order: Order) => {
+    if (!confirm(`Анхаар: ${order.id} захиалгыг буцаан "Хүлээгдэж буй" (PENDING) төлөвт шилжүүлж, хэрэглэгчийн татах эрхийг түр түгжих үү?`)) return
+    try {
+      const res = await fetch('/api/admin/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          action: 'REVERT_TO_PENDING',
+          passcode,
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        alert(`${order.id} захиалга амжилттай "Хүлээгдэж буй" төлөвт буцлаа. Хэрэглэгчийн татах эрх түгжигдсэн.`)
+        fetchOrders(passcode, true)
+      } else {
+        alert(data.error || 'Төлөв өөрчлөхөд алдаа гарлаа.')
+      }
+    } catch {
+      alert('Сүлжээний алдаа гарлаа.')
+    }
+  }
+
   // Save Store Settings
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1902,6 +1926,14 @@ export default function AdminPage() {
                                   title="Татах линкийг өөрчлөх"
                                 >
                                   Линк солих
+                                </button>
+                                <button
+                                  onClick={() => handleRevertToPending(order)}
+                                  className="text-[11px] text-amber-600 hover:text-amber-700 hover:underline cursor-pointer flex items-center gap-0.5"
+                                  title="Захиалгыг буцаан Хүлээгдэж буй (PENDING) төлөвт шилжүүлж татах холбоосыг түгжих"
+                                >
+                                  <Lock className="w-3 h-3 text-amber-500" />
+                                  <span>Түгжих</span>
                                 </button>
                               </div>
                             )}
