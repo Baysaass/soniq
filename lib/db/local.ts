@@ -244,6 +244,11 @@ export const localDB = {
       r2Key: data.r2Key || '',
       approvedAt: data.approvedAt || null,
       adminNotes: data.adminNotes || '',
+      bonumInvoiceId: data.bonumInvoiceId,
+      bonumFollowUpLink: data.bonumFollowUpLink,
+      bonumQrCode: data.bonumQrCode,
+      bonumQrImage: data.bonumQrImage,
+      bonumQrLinks: data.bonumQrLinks,
     }
 
     const updated = [newOrder, ...orders]

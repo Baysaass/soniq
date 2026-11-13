@@ -26,13 +26,24 @@ export interface Order {
   totalAmountUSD: number
   currency: 'MNT' | 'USD'
   status: OrderStatus
-  paymentMethod: 'KHAN_BANK' | 'GOLOMT_BANK' | 'QPAY' | 'FREE_DOWNLOAD' | string
+  paymentMethod: 'KHAN_BANK' | 'GOLOMT_BANK' | 'QPAY' | 'BONUM' | 'FREE_DOWNLOAD' | string
   transferReference: string
   receiptNote?: string
   weTransferLink: string
   r2Key?: string
   approvedAt: string | null
   adminNotes?: string
+  bonumInvoiceId?: string
+  bonumFollowUpLink?: string
+  bonumQrCode?: string
+  bonumQrImage?: string
+  bonumQrLinks?: Array<{
+    name: string
+    link: string
+    logo?: string
+    appStoreId?: string
+    androidPackageName?: string
+  }>
 }
 
 export async function getAllOrdersAsync(): Promise<Order[]> {

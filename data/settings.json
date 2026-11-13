@@ -26,5 +26,15 @@
     "secretAccessKey": "",
     "bucketName": "soniq-store",
     "publicDomain": ""
+  },
+  "bonumConfig": {
+    "enabled": true,
+    "merchant": "BAYSAASS",
+    "terminalId": "17173368",
+    "appSecret": "1fc53f9389f489ff6e04617bd6338a710e1e7c579cb572aec421f560f363119c0e0039e4b765e53c5339c1e6c7727985e5553f3a743f04e0c4ef0a954175b70d3bfd65f9338ee179b604e7abe9c14cf3",
+    "checksumKey": "4b0ba84726106abb9f82bde99a7c321211d655ef4a292d58ef4609f7cc829d93",
+    "baseUrl": "https://apis.bonum.mn",
+    "endpoint": "https://psp.bonum.mn",
+    "portalAdmin": "uskhuut781@gmail.com"
   }
 }

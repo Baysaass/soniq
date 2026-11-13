@@ -16,6 +16,9 @@ import {
   Sparkles,
   Cloud,
   AlertCircle,
+  Zap,
+  CreditCard,
+  QrCode,
 } from 'lucide-react'
 import { InstagramIcon, TelegramIcon } from '@/components/icons/social'
 import { STORE_SETTINGS } from '@/lib/store-data'
@@ -46,6 +49,17 @@ interface OrderData {
   r2Key?: string | null
   approvedAt?: string | null
   adminNotes?: string
+  bonumInvoiceId?: string
+  bonumFollowUpLink?: string
+  bonumQrCode?: string
+  bonumQrImage?: string
+  bonumQrLinks?: Array<{
+    name: string
+    link: string
+    logo?: string
+    appStoreId?: string
+    androidPackageName?: string
+  }>
 }
 
 export default function OrderPage({ params }: { params: Promise<{ id: string }> }) {
@@ -58,6 +72,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [r2DownloadUrl, setR2DownloadUrl] = useState<string | null>(null)
   const [r2Error, setR2Error] = useState<string | null>(null)
   const [copiedR2Link, setCopiedR2Link] = useState(false)
+  const [initiatingBonum, setInitiatingBonum] = useState(false)
+  const [bonumError, setBonumError] = useState<string | null>(null)
 
   const fetchOrder = async () => {
     try {
@@ -143,6 +159,42 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       setR2Error(error.message)
     } finally {
       setGeneratingR2(false)
+    }
+  }
+
+  const handlePayWithBonum = async (mode: 'invoice' | 'qr' = 'invoice') => {
+    if (!order) return
+    setInitiatingBonum(true)
+    setBonumError(null)
+    try {
+      const res = await fetch('/api/bonum/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: order.id,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          customerPhone: order.customerPhone,
+          items: order.items,
+          totalAmountMNT: order.totalAmountMNT,
+          totalAmountUSD: order.totalAmountUSD,
+          currency: order.currency,
+          mode,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Bonum Gateway нэхэмжлэх үүсгэхэд алдаа гарлаа.')
+      }
+      if (data.followUpLink) {
+        window.location.href = data.followUpLink
+      } else {
+        await fetchOrder()
+      }
+    } catch (err: any) {
+      setBonumError(err.message || 'Сүлжээний алдаа гарлаа.')
+    } finally {
+      setInitiatingBonum(false)
     }
   }
 
@@ -380,28 +432,119 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               </div>
 
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 text-[11px] font-bold uppercase mb-2 border border-amber-200">
-                <span>ТӨЛБӨР ШАЛГАГДАЖ БАЙНА</span>
+                <span>ТӨЛБӨР ХҮЛЭЭГДЭЖ БАЙНА</span>
               </div>
 
               <h1 className="text-xl sm:text-2xl font-bold text-[#141414]">
-                Төлбөр шалгагдаж байна
+                Төлбөрөө гүйцээнэ үү
               </h1>
 
               <p className="mt-1.5 text-xs text-zinc-600 max-w-md leading-relaxed">
-                Таны шилжүүлсэн төлбөрийг манай админ шалгаж байна. Баталгаажмагц таны{' '}
-                <span className="font-semibold text-zinc-900">{order.customerEmail}</span> хаяг руу болон энэ хуудсанд WeTransfer линк шууд нээгдэнэ.
+                Төлбөр төлөгдсөн даруйд систем автоматаар баталгаажуулж, таны{' '}
+                <span className="font-semibold text-zinc-900">{order.customerEmail}</span> хаяг руу болон энэ хуудсанд татах холбоос шууд нээгдэнэ.
               </p>
 
-              {/* Auto polling notice */}
-              <div className="mt-4 flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
-                <RefreshCw className="w-3 h-3 animate-spin text-[#00B0FF]" />
-                <span>Хуудас төлөвийг автоматаар шалгаж байна</span>
+              {/* Bonum Instant Payment Actions */}
+              <div className="w-full max-w-md mt-5 space-y-3">
+                {bonumError && (
+                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-1.5 text-left">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{bonumError}</span>
+                  </div>
+                )}
+
+                {order.bonumFollowUpLink ? (
+                  <div className="space-y-2">
+                    <a
+                      href={order.bonumFollowUpLink}
+                      className="w-full py-3.5 px-5 rounded-full bg-[#141414] hover:bg-black text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 group"
+                    >
+                      <Zap className="w-4 h-4 text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
+                      <span>BONUM-ЭЭР ТӨЛӨХ (QPAY · КАРТ)</span>
+                      <ExternalLink className="w-3.5 h-3.5 opacity-70 ml-1" />
+                    </a>
+                    <span className="text-[10px] text-zinc-400 block text-center">
+                      Нэхэмжлэхийн дугаар: <code className="font-mono text-zinc-600">{order.bonumInvoiceId}</code>
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handlePayWithBonum('invoice')}
+                    disabled={initiatingBonum}
+                    className="w-full py-3.5 px-5 rounded-full bg-[#141414] hover:bg-black disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 group"
+                  >
+                    {initiatingBonum ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 text-[#00B0FF] animate-spin" />
+                        <span>ТӨЛБӨРИЙН ХОЛБООС ҮҮСГЭЖ БАЙНА...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-4 h-4 text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
+                        <span>⚡ BONUM-ЭЭР ШУУД ТӨЛӨХ (QPAY · КАРТ)</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Optional QR Display if generated */}
+                {order.bonumQrImage && (
+                  <div className="p-4 bg-[#F7F7F5] border border-[#E6E6E3] rounded-2xl text-center space-y-3">
+                    <span className="text-xs font-bold text-zinc-800 block">
+                      Банкны апп-аараа уншуулж төлөх (QPay QR)
+                    </span>
+                    <img
+                      src={
+                        order.bonumQrImage.startsWith('data:')
+                          ? order.bonumQrImage
+                          : `data:image/png;base64,${order.bonumQrImage}`
+                      }
+                      alt="QPay QR"
+                      className="w-48 h-48 mx-auto rounded-xl border border-zinc-200 bg-white p-2 shadow-xs"
+                    />
+
+                    {order.bonumQrLinks && order.bonumQrLinks.length > 0 && (
+                      <div className="pt-2">
+                        <span className="text-[11px] text-zinc-500 font-medium block mb-2">
+                          Эсвэл банкны апп-аараа шууд нээх:
+                        </span>
+                        <div className="flex flex-wrap items-center justify-center gap-1.5 max-h-36 overflow-y-auto">
+                          {order.bonumQrLinks.map((bank, bIdx) => (
+                            <a
+                              key={bIdx}
+                              href={bank.link}
+                              className="px-2.5 py-1 rounded-lg bg-white border border-[#E6E6E3] hover:bg-zinc-50 text-[11px] font-semibold text-zinc-700 transition-colors inline-flex items-center gap-1"
+                            >
+                              <span>{bank.name}</span>
+                              <ExternalLink className="w-2.5 h-2.5 opacity-50" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Auto polling notice & Manual Check */}
+              <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-mono">
+                  <RefreshCw className="w-3 h-3 animate-spin text-[#00B0FF]" />
+                  <span>Төлөвийг автоматаар шалгаж байна</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchOrder()}
+                  className="px-3 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                >
+                  Дахин шалгах
+                </button>
               </div>
 
               {/* Support shortcuts */}
               <div className="mt-5 p-3 rounded-xl bg-[#F7F7F5] border border-[#E6E6E3] w-full max-w-sm text-center">
                 <span className="text-[11px] text-zinc-600 block mb-2 font-medium">
-                  Хурдан баталгаажуулахыг хүсвэл баримтаа илгээнэ үү:
+                  Асуулт гарвал холбогдох:
                 </span>
                 <div className="flex items-center justify-center gap-2">
                   <a

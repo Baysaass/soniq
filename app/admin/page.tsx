@@ -1866,7 +1866,13 @@ export default function AdminPage() {
                           </td>
 
                           <td className="py-3 px-3 text-[11px] text-zinc-600">
-                            {order.receiptNote || '—'}
+                            {order.paymentMethod === 'BONUM' ? (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[10px] border border-blue-200">
+                                ⚡ Bonum {order.bonumInvoiceId ? `(#${order.bonumInvoiceId.slice(-6)})` : ''}
+                              </span>
+                            ) : (
+                              order.receiptNote || '—'
+                            )}
                           </td>
 
                           <td className="py-3 px-3">

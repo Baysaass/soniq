@@ -273,6 +273,26 @@ export const db = {
     return localDB.createOrder(orderData)
   },
 
+  async updateOrder(id: string, updates: Partial<Order>): Promise<Order | null> {
+    invalidateOrdersCache()
+    const provider = getActiveDBProvider()
+    if (provider === 'supabase') {
+      try {
+        return await supabaseDB.updateOrder(id, updates)
+      } catch (err) {
+        return localDB.updateOrder(id, updates)
+      }
+    }
+    if (provider === 'postgres') {
+      try {
+        return await postgresDB.updateOrder(id, updates)
+      } catch (err) {
+        return localDB.updateOrder(id, updates)
+      }
+    }
+    return localDB.updateOrder(id, updates)
+  },
+
   async approveOrder(
     id: string,
     customWeTransferLink?: string,

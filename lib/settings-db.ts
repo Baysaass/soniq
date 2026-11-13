@@ -13,6 +13,17 @@ export interface R2Config {
 import type { StoreCategory } from './store-data'
 export type { StoreCategory }
 
+export interface BonumConfig {
+  enabled: boolean
+  merchant: string
+  terminalId: string
+  appSecret: string
+  checksumKey: string
+  baseUrl: string
+  endpoint: string
+  portalAdmin?: string
+}
+
 export interface StoreSettingsType {
   storeName: string
   subdomain: string
@@ -32,6 +43,7 @@ export interface StoreSettingsType {
   }
   defaultBundleWeTransfer: string
   r2Config?: R2Config
+  bonumConfig?: BonumConfig
   telegramBotToken?: string
   telegramChatId?: string
   resendApiKey?: string
