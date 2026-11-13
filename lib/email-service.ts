@@ -357,6 +357,38 @@ export function buildOrderCreatedEmailHtml(params: {
         </div>
       </div>
 
+      ${
+        order.paymentMethod === 'BONUM'
+          ? `
+      <!-- Bonum Payment Box -->
+      <div style="background: #1c1d21; border: 1px solid #3f3f46; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+        <div style="font-size: 12px; font-weight: 800; color: #00B0FF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+          ⚡ Bonum төлбөрийн заавар (QPay · Карт):
+        </div>
+        
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Төлбөрийн хэлбэр:</td>
+            <td style="padding: 6px 0; color: #ffffff; font-weight: 700; text-align: right;">Bonum (QPay · Карт · Apple Pay)</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Захиалгын дугаар:</td>
+            <td style="padding: 6px 0; color: #00B0FF; font-family: monospace; font-size: 15px; font-weight: 900; text-align: right;">${order.id}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #a1a1aa;">Нийт дүн:</td>
+            <td style="padding: 6px 0; color: #10b981; font-family: monospace; font-size: 16px; font-weight: 900; text-align: right;">
+              ${order.currency === 'USD' ? `$${(order.totalAmountUSD || 0).toFixed(2)}` : `${(order.totalAmountMNT || 0).toLocaleString()}₮`}
+            </td>
+          </tr>
+        </table>
+        
+        <div style="font-size: 11px; color: #a1a1aa; margin-top: 12px; border-top: 1px dashed #3f3f46; padding-top: 10px; line-height: 1.4;">
+          🚀 Та төлбөрөө QPay эсвэл картаар төлмөгц татах эрх автоматаар нээгдэж, татах холбоос энэхүү и-мэйлээр шууд очно.
+        </div>
+      </div>
+      `
+          : `
       <!-- Bank Transfer Box -->
       <div style="background: #1c1d21; border: 1px solid #3f3f46; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
         <div style="font-size: 12px; font-weight: 800; color: #00B0FF; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
@@ -392,11 +424,13 @@ export function buildOrderCreatedEmailHtml(params: {
           ⚠️ Анхаар: Гүйлгээний утга дээр зөвхөн захиалгын код болох <strong style="color: #ffffff;">${order.transferReference || order.id}</strong> утгыг бичиж шилжүүлнэ үү.
         </div>
       </div>
+      `
+      }
 
       <!-- Action Button -->
       <div style="text-align: center; margin: 24px 0 20px 0;">
         <a href="${orderPageUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; width: 100%; box-sizing: border-box; background: linear-gradient(135deg, #00B0FF 0%, #0088CC 100%); color: #ffffff; text-decoration: none; font-size: 15px; font-weight: 800; padding: 15px 24px; border-radius: 12px; text-align: center;">
-          🔍 Захиалгын төлөв харах
+          ${order.paymentMethod === 'BONUM' ? '⚡ BONUM-ЭЭР ТӨЛБӨРӨӨ ТӨЛӨХ / ТАТАХ' : '🔍 Захиалгын төлөв харах'}
         </a>
       </div>
 
@@ -420,7 +454,11 @@ export function buildOrderCreatedEmailHtml(params: {
         💡 Төлбөр төлсний дараа:
       </div>
       <p style="margin: 0; font-size: 12px; color: #a1a1aa;">
-        Манай админ таны Хаан банкны гүйлгээг шалгаж баталгаажуулмагц таны энэхүү <strong style="color: #ffffff;">${escapeHtml(order.customerEmail)}</strong> и-мэйл рүү <strong>Google Drive татах холбоос</strong> автоматаар очих болно. Мөн та дээрх товч дээр дарж захиалгынхаа хуудаснаас шууд татах боломжтой.
+        ${
+          order.paymentMethod === 'BONUM'
+            ? `Таны Bonum төлбөр баталгаажмагц таны энэхүү <strong style="color: #ffffff;">${escapeHtml(order.customerEmail)}</strong> и-мэйл рүү <strong>татах холбоос</strong> автоматаар шууд очих болно. Мөн та дээрх товч дээр дарж захиалгын хуудсаа нээгээд шууд татах боломжтой.`
+            : `Манай админ таны Хаан банкны гүйлгээг шалгаж баталгаажуулмагц таны энэхүү <strong style="color: #ffffff;">${escapeHtml(order.customerEmail)}</strong> и-мэйл рүү <strong>Google Drive татах холбоос</strong> автоматаар очих болно. Мөн та дээрх товч дээр дарж захиалгынхаа хуудаснаас шууд татах боломжтой.`
+        }
       </p>
     </div>
 

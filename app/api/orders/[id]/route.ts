@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getBonumGatewayClient } from '@/lib/bonum'
+import { sendOrderApprovedEmail } from '@/lib/email-service'
+import { sendTelegramOrderApprovedNotification } from '@/lib/telegram'
 
 export async function GET(
   request: Request,
@@ -7,14 +10,52 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const order = await db.getOrderById(id)
+    let order = await db.getOrderById(id)
 
     if (!order) {
       return NextResponse.json({ error: 'Захиалга олдсонгүй' }, { status: 404 })
     }
 
-    // If order is approved, return full details including WeTransfer download link!
-    // If pending, hide sensitive download link until admin approves it.
+    // ACTIVE BONUM VERIFICATION:
+    // If order is still PENDING and has a Bonum invoice, actively check Bonum's API
+    // This guarantees immediate unlocking of downloads even if webhook was delayed!
+    if (order.status === 'PENDING' && order.bonumInvoiceId) {
+      try {
+        const client = getBonumGatewayClient()
+        const invoiceData: any = await client.getInvoice(order.bonumInvoiceId)
+        if (
+          invoiceData &&
+          (invoiceData.status === 'SUCCESS' ||
+            invoiceData.status === 'PAID' ||
+            invoiceData.status === 'APPROVED' ||
+            (invoiceData.paymentVendor &&
+              invoiceData.status !== 'FAILED' &&
+              invoiceData.status !== 'CANCELLED'))
+        ) {
+          const siteUrl = new URL(request.url).origin
+          const settings = await db.getSettings().catch(() => null)
+          const fallbackLink = order.weTransferLink || settings?.defaultBundleWeTransfer || ''
+
+          const approved = await db.approveOrder(
+            order.id,
+            fallbackLink,
+            `Bonum-ээр шууд шалгагдаж баталгаажсан (Нэхэмжлэх: ${order.bonumInvoiceId})`,
+            order.r2Key
+          )
+
+          if (approved) {
+            order = approved
+            // Background dispatch notifications
+            sendOrderApprovedEmail({ order, siteUrl }).catch(console.warn)
+            sendTelegramOrderApprovedNotification(order, true, siteUrl).catch(console.warn)
+          }
+        }
+      } catch (checkErr: any) {
+        // Silently continue if Bonum check fails (rate limit or network)
+      }
+    }
+
+    // If order is approved, return full details including download links!
     const isApproved = order.status === 'APPROVED'
 
     return NextResponse.json({

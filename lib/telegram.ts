@@ -223,7 +223,7 @@ export function formatOrderApprovedNotificationText(
   siteUrl: string = 'https://shop.soniq.click'
 ): string {
   const itemsText = (order.items || [])
-    .map((item) => `  • <b>${escapeHtml(item.title)}</b>`)
+    .map((item) => `  • <b>${escapeHtml(item.title)}</b> (${item.price ? Number(item.price).toLocaleString() + '₮' : ''})`)
     .join('\n')
 
   const totalFormatted =
@@ -238,25 +238,36 @@ export function formatOrderApprovedNotificationText(
 
   const emailStatusText =
     emailSent === undefined
-      ? 'Илгээгдсэн'
+      ? 'Илгээгдсэн ✓'
       : emailSent
       ? 'Амжилттай хүргэгдсэн ✓'
-      : '⚠️ И-мэйл илгээгдсэнгүй (Resend шалгах)'
+      : '⚠️ И-мэйл хүргэлт хүлээгдэж байна'
 
-  return `✅ <b>ЗАХИАЛГА БАТАЛГААЖЛАА!</b>
+  const channelText =
+    order.paymentMethod === 'BONUM'
+      ? '⚡ Bonum (QPay / Карт)'
+      : order.paymentMethod === 'FREE_DOWNLOAD'
+      ? '🎁 Үнэгүй таталт'
+      : (order.paymentMethod || 'Хаан Банк')
+
+  return `🎉 <b>ТӨЛБӨР БАТАЛГААЖЛАА! (ШУУД ТАТАХ ЭРХ НЭЭГДСЭН)</b>
 ━━━━━━━━━━━━━━━━━━━━
 📦 <b>Захиалга:</b> <code>${escapeHtml(order.id)}</code>
-📅 <b>Баталгаажсан:</b> ${escapeHtml(dateStr)}
+📅 <b>Огноо:</b> ${escapeHtml(dateStr)}
 
-👤 <b>Захиалагч:</b> ${escapeHtml(order.customerName)}
+👤 <b>Харилцагч:</b> ${escapeHtml(order.customerName)}
+📧 <b>Gmail / И-мэйл:</b> <code>${escapeHtml(order.customerEmail)}</code>
 📞 <b>Утас:</b> <code>${escapeHtml(order.customerPhone || 'Утасгүй')}</code>
-📧 <b>Gmail (Drive):</b> <code>${escapeHtml(order.customerEmail)}</code>
-💰 <b>Төлбөр:</b> <b>${totalFormatted}</b> (${escapeHtml(order.paymentMethod || 'Хаан Банк')})
-📥 <b>Татах суваг:</b> ${order.r2Key && order.weTransferLink ? 'Cloudflare R2 + Google Drive' : order.r2Key ? '☁️ Cloudflare R2' : '📁 Google Drive / Линк'}
 
-🚀 <b>И-мэйл хүргэлт:</b> ${emailStatusText}
-🔓 <b>Татах эрх:</b> Нээгдсэн (Идэвхтэй ✓)
-🛒 <b>Бүтээгдэхүүн:</b>
+💰 <b>Төлсөн дүн:</b> <b>${totalFormatted}</b>
+💳 <b>Суваг:</b> ${escapeHtml(channelText)}
+${order.bonumInvoiceId ? `🧾 <b>Нэхэмжлэх ID:</b> <code>${escapeHtml(order.bonumInvoiceId)}</code>\n` : ''}
+📥 <b>Татах суваг:</b> ${order.r2Key && order.weTransferLink ? 'Cloudflare R2 + Google Drive' : order.r2Key ? '☁️ Cloudflare R2' : '📁 Google Drive / WeTransfer'}
+${order.weTransferLink ? `🔗 <b>Холбоос:</b> <a href="${escapeHtml(order.weTransferLink)}">Google Drive / Линк</a>\n` : ''}
+✉️ <b>И-мэйл хүргэлт:</b> ${emailStatusText}
+🔓 <b>Татах эрх:</b> Шууд нээгдсэн (Идэвхтэй ✓)
+
+🛒 <b>Захиалсан бүтээгдэхүүн:</b>
 ${itemsText || '  • Дижитал багц'}
 ━━━━━━━━━━━━━━━━━━━━
 👉 <a href="${siteUrl}/order/${escapeHtml(order.id)}">Хэрэглэгчийн татах хуудсыг нээх</a>`
@@ -388,26 +399,30 @@ export async function sendTelegramOrderApprovedNotification(
     const approvalToken = generateOrderApprovalToken(order.id, secret)
     const text = formatOrderApprovedNotificationText(order, emailSent, siteUrl)
 
-    const replyMarkup = {
-      inline_keyboard: [
-        [
-          {
-            text: '👁 Хэрэглэгчийн татах хуудас',
-            url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
-          },
-          {
-            text: '🔒 Төлөв буцаах / Түгжих',
-            url: `${siteUrl}/api/admin/orders/quick-approve?orderId=${encodeURIComponent(order.id)}&token=${approvalToken}`,
-          },
-        ],
-        [
-          {
-            text: '⚙️ Админ самбар',
-            url: `${siteUrl}/admin`,
-          },
-        ],
+    const inlineKeyboard: any[] = [
+      [
+        {
+          text: '👁 Хэрэглэгчийн татах хуудас',
+          url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
+        },
       ],
+    ]
+
+    if (order.weTransferLink) {
+      inlineKeyboard[0].push({
+        text: '📁 Drive / Линк',
+        url: order.weTransferLink,
+      })
     }
+
+    inlineKeyboard.push([
+      {
+        text: '⚙️ Админ самбар',
+        url: `${siteUrl}/admin`,
+      },
+    ])
+
+    const replyMarkup = { inline_keyboard: inlineKeyboard }
 
     return await sendTelegramMessage({
       botToken,

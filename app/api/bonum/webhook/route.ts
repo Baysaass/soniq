@@ -6,7 +6,27 @@ import {
   getBonumCredentials,
 } from '@/lib/bonum'
 import { sendOrderApprovedEmail } from '@/lib/email-service'
-import { sendTelegramMessage } from '@/lib/telegram'
+import { sendTelegramOrderApprovedNotification, sendTelegramMessage } from '@/lib/telegram'
+
+/**
+ * GET handler: Allows browser checks, uptime monitors, and portal verification
+ * Prevents HTTP 405 Method Not Allowed when opened in browser or checked by GET probes.
+ */
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  return NextResponse.json({
+    status: 'ONLINE',
+    service: 'SONIQ Bonum Webhook Receiver',
+    endpoint: `${url.origin}/api/bonum/webhook`,
+    methods: ['POST', 'GET', 'HEAD'],
+    message: 'Bonum төлбөрийн webhook хүлээн авагч хэвийн ажиллаж байна. Bonum-оос ирэх POST мэдэгдлийг хүлээн авахад бэлэн.',
+    timestamp: new Date().toISOString(),
+  })
+}
+
+export async function HEAD() {
+  return new Response(null, { status: 200 })
+}
 
 export async function POST(request: Request) {
   try {
@@ -42,9 +62,13 @@ export async function POST(request: Request) {
     // 1. PAYMENT EVENT
     // -------------------------------------------------------------
     if (event.type === 'PAYMENT') {
-      const body = event.body as any
-      const transactionId = body?.transactionId || body?.orderId
-      const invoiceId = body?.invoiceId
+      const body = (event.body || {}) as any
+      const transactionId =
+        body?.transactionId ||
+        body?.orderId ||
+        body?.c_transaction_id ||
+        body?.merchant_transaction_id
+      const invoiceId = body?.invoiceId || body?.c_invoice_id
 
       if (event.status === 'SUCCESS') {
         if (!transactionId && !invoiceId) {
@@ -64,6 +88,17 @@ export async function POST(request: Request) {
           const allOrders = await db.getOrders(true)
           order = allOrders.find((o) => o.bonumInvoiceId === invoiceId) || null
         }
+        if (!order && rawTxId) {
+          const allOrders = await db.getOrders(true)
+          order =
+            allOrders.find(
+              (o) =>
+                o.id.toLowerCase() === rawTxId.toLowerCase() ||
+                o.id.toLowerCase() === baseOrderId.toLowerCase() ||
+                o.transferReference?.toLowerCase() === rawTxId.toLowerCase() ||
+                o.transferReference?.toLowerCase() === baseOrderId.toLowerCase()
+            ) || null
+        }
 
         if (!order) {
           console.warn(`[Bonum Webhook] Order not found for tx: ${transactionId}, inv: ${invoiceId}`)
@@ -75,69 +110,49 @@ export async function POST(request: Request) {
           return NextResponse.json({ status: 'ALREADY_APPROVED' }, { status: 200 })
         }
 
+        // Fallback WeTransfer link from settings if missing
+        const settings = await db.getSettings().catch(() => null)
+        const resolvedDownloadLink =
+          order.weTransferLink || settings?.defaultBundleWeTransfer || ''
+
         // Mark order as APPROVED
         const approvedOrder = await db.approveOrder(
           order.id,
-          order.weTransferLink,
+          resolvedDownloadLink,
           `Bonum-ээр төлбөр баталгаажсан (Нэхэмжлэх: ${invoiceId || 'N/A'})`,
           order.r2Key
         )
 
         const finalOrder = approvedOrder || {
           ...order,
+          weTransferLink: resolvedDownloadLink,
           status: 'APPROVED' as const,
           approvedAt: new Date().toISOString(),
         }
 
         // 1. Send customer immediate approval email with download links
-        sendOrderApprovedEmail({
-          order: finalOrder,
-          siteUrl,
-        }).catch((err) => {
-          console.error('[Bonum Webhook] sendOrderApprovedEmail failed:', err)
-        })
-
-        // 2. Dispatch Telegram notification to admin
+        let emailSuccess = false
         try {
-          const settings = await db.getSettings().catch(() => null)
-          const botToken =
-            process.env.TELEGRAM_BOT_TOKEN ||
-            settings?.bankInfo?.telegramBotToken ||
-            settings?.telegramBotToken ||
-            ''
-          const chatId =
-            process.env.TELEGRAM_CHAT_ID ||
-            settings?.bankInfo?.telegramChatId ||
-            settings?.telegramChatId ||
-            ''
+          const emailRes = await sendOrderApprovedEmail({
+            order: finalOrder,
+            siteUrl,
+          })
+          emailSuccess = Boolean(emailRes.success)
+        } catch (err) {
+          console.error('[Bonum Webhook] sendOrderApprovedEmail failed:', err)
+        }
 
-          if (botToken && chatId) {
-            const amountFormatted = `${(finalOrder.totalAmountMNT || 0).toLocaleString()}₮`
-            const tgMessage = `🎉 <b>BONUM — ТӨЛБӨР АМЖИЛТТАЙ!</b>
-━━━━━━━━━━━━━━━━━━━━
-📦 <b>Захиалга:</b> <code>${finalOrder.id}</code>
-💳 <b>Суваг:</b> Bonum (QPay / Карт)
-💰 <b>Төлөгдсөн:</b> <b>${amountFormatted}</b>
-👤 <b>Харилцагч:</b> ${finalOrder.customerName}
-📧 <b>И-мэйл:</b> <code>${finalOrder.customerEmail}</code>
-📞 <b>Утас:</b> <code>${finalOrder.customerPhone || 'N/A'}</code>
-🧾 <b>Нэхэмжлэх ID:</b> <code>${invoiceId || 'N/A'}</code>
-
-🚀 <i>Хэрэглэгчид татах холбоосыг и-мэйлээр автоматаар илгээлээ.</i>
-━━━━━━━━━━━━━━━━━━━━
-👉 <a href="${siteUrl}/order/${finalOrder.id}">Захиалгын хуудас үзэх</a>`
-
-            sendTelegramMessage({
-              botToken,
-              chatId,
-              text: tgMessage,
-            }).catch((e) => console.warn('[Bonum Webhook] Telegram warning:', e))
-          }
+        // 2. Dispatch complete Telegram notification to admin
+        try {
+          await sendTelegramOrderApprovedNotification(finalOrder, emailSuccess, siteUrl)
         } catch (tgErr) {
           console.warn('[Bonum Webhook] Telegram alert error:', tgErr)
         }
 
-        return NextResponse.json({ status: 'SUCCESS_APPROVED', orderId: order.id }, { status: 200 })
+        return NextResponse.json(
+          { success: true, status: 'SUCCESS_APPROVED', orderId: order.id },
+          { status: 200 }
+        )
       } else {
         console.warn(`[Bonum Webhook] Payment failed or cancelled for tx: ${transactionId}`)
         return NextResponse.json({ status: 'PAYMENT_FAILED' }, { status: 200 })
