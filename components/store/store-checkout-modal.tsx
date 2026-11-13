@@ -633,7 +633,7 @@ export function StoreCheckoutModal() {
               >
                 <div className="flex items-center gap-1.5">
                   <Zap className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Bonum Gateway</span>
+                  <span>Bonum</span>
                   <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">Шуурхай</span>
                 </div>
                 <span className="text-[10px] text-zinc-400 font-normal mt-0.5">
@@ -757,7 +757,7 @@ export function StoreCheckoutModal() {
 
                 <div className="flex items-center justify-center gap-1.5 text-[10px] text-zinc-400 text-center pt-1">
                   <Lock className="w-3 h-3 text-emerald-600" />
-                  <span>Bonum Gateway-ийн найдвартай, шифрлэгдсэн төлбөрийн системээр хамгаалагдсан.</span>
+                  <span>Bonum-ийн найдвартай, шифрлэгдсэн төлбөрийн системээр хамгаалагдсан.</span>
                 </div>
               </form>
             ) : (

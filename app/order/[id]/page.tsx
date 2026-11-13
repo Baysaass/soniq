@@ -184,7 +184,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Bonum Gateway нэхэмжлэх үүсгэхэд алдаа гарлаа.')
+        throw new Error(data.error || 'Bonum нэхэмжлэх үүсгэхэд алдаа гарлаа.')
       }
       if (data.followUpLink) {
         window.location.href = data.followUpLink

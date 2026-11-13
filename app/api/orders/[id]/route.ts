@@ -33,6 +33,11 @@ export async function GET(
       weTransferLink: isApproved ? order.weTransferLink : null,
       r2Key: isApproved ? (order.r2Key || null) : null,
       adminNotes: order.adminNotes,
+      bonumInvoiceId: order.bonumInvoiceId || null,
+      bonumFollowUpLink: order.bonumFollowUpLink || null,
+      bonumQrCode: order.bonumQrCode || null,
+      bonumQrImage: order.bonumQrImage || null,
+      bonumQrLinks: order.bonumQrLinks || null,
     })
   } catch (error) {
     console.error('Error fetching order:', error)

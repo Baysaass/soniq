@@ -52,8 +52,14 @@ export async function POST(request: Request) {
           return NextResponse.json({ status: 'IGNORED_NO_ID' }, { status: 200 })
         }
 
-        // Find the matching order
-        let order = transactionId ? await db.getOrderById(transactionId) : null
+        // Find the matching order by exact ID, or strip retry suffix (SQ-xxxxx_yyy), or match by bonumInvoiceId
+        const rawTxId = (transactionId || '').toString().trim()
+        const baseOrderId = rawTxId.includes('_') ? rawTxId.split('_')[0] : rawTxId
+
+        let order = rawTxId ? await db.getOrderById(rawTxId) : null
+        if (!order && baseOrderId) {
+          order = await db.getOrderById(baseOrderId)
+        }
         if (!order && invoiceId) {
           const allOrders = await db.getOrders(true)
           order = allOrders.find((o) => o.bonumInvoiceId === invoiceId) || null
@@ -73,7 +79,7 @@ export async function POST(request: Request) {
         const approvedOrder = await db.approveOrder(
           order.id,
           order.weTransferLink,
-          `Bonum Gateway-ээр төлбөр баталгаажсан (Нэхэмжлэх: ${invoiceId || 'N/A'})`,
+          `Bonum-ээр төлбөр баталгаажсан (Нэхэмжлэх: ${invoiceId || 'N/A'})`,
           order.r2Key
         )
 
@@ -107,10 +113,10 @@ export async function POST(request: Request) {
 
           if (botToken && chatId) {
             const amountFormatted = `${(finalOrder.totalAmountMNT || 0).toLocaleString()}₮`
-            const tgMessage = `🎉 <b>BONUM GATEWAY — ТӨЛБӨР АМЖИЛТТАЙ!</b>
+            const tgMessage = `🎉 <b>BONUM — ТӨЛБӨР АМЖИЛТТАЙ!</b>
 ━━━━━━━━━━━━━━━━━━━━
 📦 <b>Захиалга:</b> <code>${finalOrder.id}</code>
-💳 <b>Суваг:</b> Bonum Gateway (QPay / Карт)
+💳 <b>Суваг:</b> Bonum (QPay / Карт)
 💰 <b>Төлөгдсөн:</b> <b>${amountFormatted}</b>
 👤 <b>Харилцагч:</b> ${finalOrder.customerName}
 📧 <b>И-мэйл:</b> <code>${finalOrder.customerEmail}</code>

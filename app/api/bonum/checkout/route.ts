@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const creds = getBonumCredentials()
     if (!creds.enabled) {
       return NextResponse.json(
-        { error: 'Bonum Gateway систем одоогоор түр хаалттай байна.' },
+        { error: 'Bonum систем одоогоор түр хаалттай байна.' },
         { status: 503 }
       )
     }
@@ -112,10 +112,38 @@ export async function POST(request: Request) {
       })
     }
 
+    // Reuse existing followUpLink if already generated for this order
+    if (mode === 'invoice' && order.bonumFollowUpLink) {
+      return NextResponse.json({
+        success: true,
+        mode: 'invoice',
+        orderId: order.id,
+        invoiceId: order.bonumInvoiceId,
+        followUpLink: order.bonumFollowUpLink,
+      })
+    }
+
+    // Generate unique transactionId for retry attempts to avoid 409 conflict
+    const txId = order.bonumInvoiceId
+      ? `${order.id}_${Date.now().toString(36)}`
+      : order.id
+
     // 1. If QR mode requested
     if (mode === 'qr') {
+      if (order.bonumQrCode && order.bonumQrImage) {
+        return NextResponse.json({
+          success: true,
+          mode: 'qr',
+          orderId: order.id,
+          invoiceId: order.bonumInvoiceId,
+          qrCode: order.bonumQrCode,
+          qrImage: order.bonumQrImage,
+          links: order.bonumQrLinks || [],
+        })
+      }
+
       try {
-        const qrRes = await createBonumQr({ order })
+        const qrRes = await createBonumQr({ order, transactionId: txId })
         await db.updateOrder(order.id, {
           paymentMethod: 'BONUM',
           bonumInvoiceId: qrRes.invoiceId,
@@ -138,11 +166,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Default: Create web invoice (redirect to Bonum checkout page with QPay, cards, etc.)
+    // 2. Default: Create web invoice (redirect to Bonum checkout page with QPay, cards, Apple Pay)
     const invoiceRes = await createBonumInvoice({
       order,
       siteUrl,
       expiresInSeconds: 3600,
+      transactionId: txId,
     })
 
     await db.updateOrder(order.id, {
@@ -159,10 +188,16 @@ export async function POST(request: Request) {
       followUpLink: invoiceRes.followUpLink,
     })
   } catch (error: any) {
-    console.error('[Bonum Checkout API Error]:', error)
+    const errorMsg =
+      error?.response?.message ||
+      error?.response?.error ||
+      error?.message ||
+      'Bonum төлбөрийн холболт үүсгэхэд алдаа гарлаа.'
+
+    console.error('[Bonum Checkout API Error]:', errorMsg, error?.response || '')
     return NextResponse.json(
       {
-        error: error?.message || 'Bonum Gateway төлбөрийн холболт үүсгэхэд алдаа гарлаа.',
+        error: errorMsg,
         details: error?.response || undefined,
       },
       { status: 500 }

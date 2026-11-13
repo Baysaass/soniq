@@ -25,3 +25,4 @@ next-env.d.ts
 
 # Local tooling
 .claude/
+data/.bonum-tokens.json

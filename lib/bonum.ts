@@ -174,6 +174,7 @@ export async function createBonumInvoice(params: {
   order: Order
   siteUrl?: string
   expiresInSeconds?: number
+  transactionId?: string
 }): Promise<{
   invoiceId: string
   followUpLink: string
@@ -182,48 +183,55 @@ export async function createBonumInvoice(params: {
   const client = getBonumGatewayClient()
   const siteUrl = params.siteUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.soniq.click'
   const callbackUrl = `${siteUrl}/api/bonum/webhook`
+  const transactionId = (params.transactionId || order.id).slice(0, 60)
 
   // Format line items with required fields (title, amount, count, remark, image)
+  // Bonum MySQL table constraints: c_title <= 100, c_remark <= 100, c_img <= 1000
   const items: InvoiceItem[] = (order.items || []).map((it) => {
-    let imgUrl = it.image || ''
-    if (imgUrl && !imgUrl.startsWith('http')) {
+    let imgUrl = (it.image || '').trim()
+
+    // Guard against data URI base64 images which crash Bonum's database column (Data truncation)
+    if (imgUrl.startsWith('data:') || imgUrl.length > 500) {
+      imgUrl = ''
+    } else if (imgUrl && !imgUrl.startsWith('http://') && !imgUrl.startsWith('https://')) {
       imgUrl = `${siteUrl}${imgUrl.startsWith('/') ? '' : '/'}${imgUrl}`
     }
+
+    const title = (it.title || 'Soniq Digital Pack').trim().slice(0, 80) || 'Soniq Digital Pack'
+    const remark = (it.title || 'Soniq Store').trim().slice(0, 80) || 'Soniq Store'
+    const amount = Math.max(0, Math.round(Number(it.price) || 0))
+    const count = Math.max(1, Math.round(Number(it.quantity) || 1))
+
     return {
-      title: (it.title || 'Soniq Digital Pack').slice(0, 100),
-      amount: Math.round(it.price || 0),
-      count: it.quantity || 1,
-      remark: (it.title || 'Soniq Store').slice(0, 100),
+      title,
+      amount,
+      count,
+      remark,
       image: imgUrl || undefined,
     }
   })
 
+  const invoiceAmount = Math.max(1, Math.round(order.totalAmountMNT || 0))
+
   // If no items, generate a single item for the total
   if (items.length === 0) {
     items.push({
-      title: `Soniq Захиалга ${order.id}`,
-      amount: Math.round(order.totalAmountMNT || 0),
+      title: `Soniq Захиалга ${order.id}`.slice(0, 80),
+      amount: invoiceAmount,
       count: 1,
       remark: 'Soniq Store',
     })
   }
 
-  const invoiceAmount = Math.max(1, Math.round(order.totalAmountMNT || 0))
-
   try {
     const res = await client.createInvoice({
       amount: invoiceAmount,
       callback: callbackUrl,
-      transactionId: order.id,
+      transactionId,
       expiresIn: params.expiresInSeconds || 3600, // 1 hour expiry
       items,
-      extras: [
-        {
-          placeholder: order.customerEmail || 'Gmail / И-мэйл',
-          type: 'EMAIL',
-          required: true,
-        },
-      ],
+      // Note: Omit 'extras' to prevent Jackson deserialization issues on Bonum backend.
+      // Customer email is already persisted and managed in our store database.
     })
 
     return {
@@ -231,7 +239,7 @@ export async function createBonumInvoice(params: {
       followUpLink: res.followUpLink,
     }
   } catch (error: any) {
-    console.error('[Bonum] createInvoice failed:', error)
+    console.error('[Bonum] createInvoice failed:', error?.message, error?.response || '')
     throw error
   }
 }
@@ -242,6 +250,7 @@ export async function createBonumInvoice(params: {
 export async function createBonumQr(params: {
   order: Order
   expiresInSeconds?: number
+  transactionId?: string
 }): Promise<{
   invoiceId: string
   qrCode: string
@@ -257,17 +266,18 @@ export async function createBonumQr(params: {
   const { order } = params
   const client = getBonumGatewayClient()
   const amount = Math.max(1, Math.round(order.totalAmountMNT || 0))
+  const transactionId = (params.transactionId || order.id).slice(0, 60)
 
   try {
     const res = await client.createQr({
       amount,
-      transactionId: order.id,
+      transactionId,
       expiresIn: params.expiresInSeconds || 3600,
     })
 
     return res
   } catch (error: any) {
-    console.error('[Bonum] createQr failed:', error)
+    console.error('[Bonum] createQr failed:', error?.message, error?.response || '')
     throw error
   }
 }
