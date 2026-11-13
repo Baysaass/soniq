@@ -14,10 +14,25 @@ import { sendTelegramOrderApprovedNotification, sendTelegramMessage } from '@/li
  */
 export async function GET(request: Request) {
   const url = new URL(request.url)
+  const siteUrl = url.origin
+
+  // If a browser was redirected here after payment with orderId or txn:
+  const orderId =
+    url.searchParams.get('orderId') ||
+    url.searchParams.get('order_id') ||
+    url.searchParams.get('transactionId') ||
+    url.searchParams.get('txn') ||
+    url.searchParams.get('id')
+
+  if (orderId) {
+    const cleanId = orderId.includes('_') ? orderId.split('_')[0] : orderId
+    return NextResponse.redirect(`${siteUrl}/order/${encodeURIComponent(cleanId)}?paid=1`)
+  }
+
   return NextResponse.json({
     status: 'ONLINE',
     service: 'SONIQ Bonum Webhook Receiver',
-    endpoint: `${url.origin}/api/bonum/webhook`,
+    endpoint: `${siteUrl}/api/bonum/webhook`,
     methods: ['POST', 'GET', 'HEAD'],
     message: 'Bonum төлбөрийн webhook хүлээн авагч хэвийн ажиллаж байна. Bonum-оос ирэх POST мэдэгдлийг хүлээн авахад бэлэн.',
     timestamp: new Date().toISOString(),

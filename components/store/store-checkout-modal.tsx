@@ -241,6 +241,10 @@ export function StoreCheckoutModal() {
         clearCart()
         setIsCheckoutOpen(false)
 
+        try {
+          localStorage.setItem('soniq_last_order_id', data.orderId)
+        } catch {}
+
         if (data.followUpLink) {
           // Redirect to Bonum Payment Portal
           window.location.href = data.followUpLink

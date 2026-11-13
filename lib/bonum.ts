@@ -182,7 +182,7 @@ export async function createBonumInvoice(params: {
   const { order } = params
   const client = getBonumGatewayClient()
   const siteUrl = params.siteUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.soniq.click'
-  const callbackUrl = `${siteUrl}/api/bonum/webhook`
+  const callbackUrl = `${siteUrl}/api/bonum/callback?orderId=${encodeURIComponent(order.id)}`
   const transactionId = (params.transactionId || order.id).slice(0, 60)
 
   // Format line items with required fields (title, amount, count, remark, image)

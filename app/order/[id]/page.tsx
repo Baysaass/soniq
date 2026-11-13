@@ -74,6 +74,16 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [copiedR2Link, setCopiedR2Link] = useState(false)
   const [initiatingBonum, setInitiatingBonum] = useState(false)
   const [bonumError, setBonumError] = useState<string | null>(null)
+  const [justPaid, setJustPaid] = useState(false)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search)
+      if (sp.get('paid') === '1' || sp.get('success') === '1') {
+        setJustPaid(true)
+      }
+    }
+  }, [])
 
   const fetchOrder = async () => {
     try {
@@ -261,37 +271,44 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         {/* Status Card */}
         {isApproved ? (
           /* APPROVED / DOWNLOAD UNLOCKED SCREEN */
-          <div className="bg-white border border-emerald-200 rounded-2xl p-6 sm:p-8 shadow-xs mb-6">
+          <div className="bg-white border-2 border-emerald-500/80 rounded-2xl p-6 sm:p-8 shadow-lg shadow-emerald-500/10 mb-6 relative overflow-hidden">
+            {justPaid && (
+              <div className="mb-5 p-3.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white flex items-center justify-center gap-2 shadow-md font-extrabold text-xs sm:text-sm animate-pulse text-center">
+                <Sparkles className="w-4 h-4 fill-white shrink-0" />
+                <span>🎉 Төлбөр амжилттай баталгаажлаа! Таны бүтээгдэхүүнийг татахад бэлэн боллоо.</span>
+              </div>
+            )}
+
             <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mb-3 shadow-xs">
-                <CheckCircle2 className="w-7 h-7" />
+              <div className="w-14 h-14 rounded-full bg-emerald-50 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 mb-3 shadow-xs">
+                <CheckCircle2 className="w-8 h-8" />
               </div>
 
-              <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold uppercase mb-2 border border-emerald-200">
-                <Sparkles className="w-3 h-3" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold uppercase mb-2 border border-emerald-200">
+                <Sparkles className="w-3.5 h-3.5" />
                 <span>ТӨЛБӨР БАТАЛГААЖСАН · ТАТАХ БОЛОМЖТОЙ</span>
               </div>
 
-              <h1 className="text-xl sm:text-2xl font-bold text-[#141414]">
+              <h1 className="text-xl sm:text-2xl font-black text-[#141414]">
                 Баяр хүргэе, {order.customerName}!
               </h1>
 
-              <p className="mt-1.5 text-xs text-zinc-600 max-w-md leading-relaxed">
-                Таны төлбөр амжилттай баталгаажлаа. Доорх товч дээр даран өндөр хурдны серверээс файл багцаа шууд татаж авна уу.
+              <p className="mt-1.5 text-xs sm:text-sm text-zinc-600 max-w-md leading-relaxed">
+                Таны төлбөр амжилттай баталгаажлаа. Доорх товч дээр даран багцаа шууд татаж авна уу.
               </p>
 
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200/60 text-[#0088CC] text-[11px] font-semibold mt-2.5">
                 <span>✉️ Татах холбоосыг таны <strong>{order.customerEmail}</strong> хаяг руу бас и-мэйлээр илгээсэн.</span>
               </div>
 
-              {/* R2 Direct Download and/or WeTransfer */}
-              <div className="w-full max-w-md mt-5 space-y-3">
+              {/* Download Buttons Section */}
+              <div className="w-full max-w-md mt-6 space-y-3">
                 {order.r2Key && (
                   <div className="space-y-2">
                     <button
                       onClick={handleDownloadR2}
                       disabled={generatingR2}
-                      className="w-full py-3.5 px-5 rounded-full bg-[#141414] hover:bg-black text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full py-4 px-6 rounded-full bg-[#141414] hover:bg-black text-white font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all shadow-md hover:shadow-xl cursor-pointer flex items-center justify-center gap-2"
                     >
                       {generatingR2 ? (
                         <>
@@ -340,64 +357,79 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   </div>
                 )}
 
-                {order.weTransferLink && (
-                  <div className="space-y-2">
-                    <a
-                      href={order.weTransferLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`w-full py-3 px-5 rounded-full font-bold text-xs uppercase tracking-wide transition-all shadow-xs hover:shadow-md cursor-pointer flex items-center justify-center gap-2 ${
-                        order.r2Key
-                          ? 'bg-white hover:bg-zinc-50 text-zinc-800 border border-[#E6E6E3]'
-                          : 'bg-[#141414] hover:bg-black text-white'
-                      }`}
-                    >
-                      <Download className="w-4 h-4 text-[#00B0FF]" />
-                      <span>
-                        {order.weTransferLink.includes('drive.google.com')
-                          ? (order.r2Key ? 'GOOGLE DRIVE ТАТАХ (НӨӨЦ ХОЛБООС)' : 'GOOGLE DRIVE-ААР ТАТАЖ АВАХ')
-                          : (order.r2Key ? 'WETRANSFER ТАТАХ (НӨӨЦ ХОЛБООС)' : 'WETRANSFER-ЭЭР ТАТАЖ АВАХ')}
-                      </span>
-                      <ExternalLink className="w-3.5 h-3.5 ml-1" />
-                    </a>
+                {(() => {
+                  const effectiveLink =
+                    order.weTransferLink ||
+                    (STORE_SETTINGS as any).defaultBundleWeTransfer ||
+                    'https://we.tl/t-soniq-ultimate-bundle-2026-vfx'
 
-                    {order.weTransferLink.includes('drive.google.com') && (
-                      <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-left text-xs text-blue-950 space-y-1">
-                        <div className="font-bold flex items-center gap-1.5 text-blue-900">
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Google Drive хандах эрх нээгдсэн</span>
-                        </div>
-                        <p className="text-[11px] text-blue-800 leading-relaxed">
-                          Таны захиалга өгсөн <span className="font-mono font-bold text-blue-950 bg-blue-100/60 px-1 py-0.5 rounded">{order.customerEmail}</span> Gmail хаягт Google Drive-аар хандах эрх олгогдсон тул дээрх товч дээр дарж шууд татах эсвэл өөрийн Google Drive-даа хадгалж авна уу.
-                        </p>
-                      </div>
-                    )}
+                  if (!effectiveLink) return null
 
-                    {!order.r2Key && (
-                      <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
-                        <span className="font-mono text-[11px] truncate max-w-[240px]">
-                          {order.weTransferLink}
+                  const isGoogleDrive = effectiveLink.includes('drive.google.com')
+
+                  return (
+                    <div className="space-y-2">
+                      <a
+                        href={effectiveLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`w-full py-4 px-6 rounded-full font-extrabold text-xs sm:text-sm uppercase tracking-wide transition-all shadow-md hover:shadow-xl cursor-pointer flex items-center justify-center gap-2.5 ${
+                          order.r2Key
+                            ? 'bg-white hover:bg-zinc-50 text-zinc-900 border-2 border-emerald-500/80 shadow-emerald-500/10'
+                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/50 animate-pulse'
+                        }`}
+                      >
+                        <Download className="w-5 h-5 text-white" />
+                        <span>
+                          {isGoogleDrive
+                            ? (order.r2Key ? '📁 GOOGLE DRIVE ТАТАХ (НӨӨЦ ХОЛБООС)' : '📁 GOOGLE DRIVE-ААР ШУУД ТАТАХ')
+                            : (order.r2Key ? '⚡ WETRANSFER ТАТАХ (НӨӨЦ ХОЛБООС)' : '📥 ШУУД ТАТАЖ АВАХ (WETRANSFER)')}
                         </span>
-                        <button
-                          onClick={handleCopyLink}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-[#E6E6E3] text-zinc-700 font-semibold text-[11px] hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
-                        >
-                          {copiedLink ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span>Хуулагдлаа</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>Линк хуулах</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                        <ExternalLink className="w-4 h-4 opacity-80 ml-1" />
+                      </a>
+
+                      {isGoogleDrive && (
+                        <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-left text-xs text-blue-950 space-y-1">
+                          <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Google Drive хандах эрх нээгдсэн</span>
+                          </div>
+                          <p className="text-[11px] text-blue-800 leading-relaxed">
+                            Таны захиалга өгсөн <span className="font-mono font-bold text-blue-950 bg-blue-100/60 px-1 py-0.5 rounded">{order.customerEmail}</span> Gmail хаягт Google Drive-аар хандах эрх олгогдсон тул дээрх товч дээр дарж шууд татах эсвэл өөрийн Google Drive-даа хадгалж авна уу.
+                          </p>
+                        </div>
+                      )}
+
+                      {!order.r2Key && (
+                        <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
+                          <span className="font-mono text-[11px] truncate max-w-[240px]">
+                            {effectiveLink}
+                          </span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(effectiveLink)
+                              setCopiedLink(true)
+                              setTimeout(() => setCopiedLink(false), 2000)
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-[#E6E6E3] text-zinc-700 font-semibold text-[11px] hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
+                          >
+                            {copiedLink ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                <span>Хуулагдлаа</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Линк хуулах</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {!order.r2Key && !order.weTransferLink && (
                   <div className="mt-3 p-2.5 rounded-lg bg-zinc-100 text-xs text-zinc-500">
