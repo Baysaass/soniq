@@ -172,7 +172,37 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     }
   }
 
-  const handlePayWithBonum = async (mode: 'invoice' | 'qr' = 'invoice') => {
+  const [cancellingOrder, setCancellingOrder] = useState(false)
+
+  const handleCancelOrder = async () => {
+    if (!order || cancellingOrder) return
+    const confirmed = window.confirm('Энэ захиалгыг хааж, дэлгүүрээс шинээр захиалах уу?')
+    if (!confirmed) return
+
+    setCancellingOrder(true)
+    try {
+      const res = await fetch(`/api/orders/${order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancel',
+          reason: 'Хэрэглэгч гүйлгээ давхардахаас сэргийлж захиалгыг хаасан',
+        }),
+      })
+      if (res.ok) {
+        await fetchOrder()
+      }
+    } catch (err) {
+      console.error('Cancel order error:', err)
+    } finally {
+      setCancellingOrder(false)
+    }
+  }
+
+  const handlePayWithBonum = async (
+    mode: 'invoice' | 'qr' = 'invoice',
+    forceNew: boolean = false
+  ) => {
     if (!order) return
     setInitiatingBonum(true)
     setBonumError(null)
@@ -190,6 +220,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           totalAmountUSD: order.totalAmountUSD,
           currency: order.currency,
           mode,
+          forceNew,
         }),
       })
       const data = await res.json()
@@ -235,6 +266,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   }
 
   const isApproved = order.status === 'APPROVED'
+  const isCancelled = order.status === 'CANCELLED'
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] text-[#141414] py-8 sm:py-12 px-4 sm:px-6 font-sans">
@@ -455,6 +487,34 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               </div>
             </div>
           </div>
+        ) : isCancelled ? (
+          /* CANCELLED SCREEN */
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-xs mb-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-500 mb-3 mx-auto">
+              <AlertCircle className="w-6 h-6 text-zinc-500" />
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-zinc-100 text-zinc-600 text-[11px] font-bold uppercase mb-2 border border-zinc-200">
+              <span>ЗАХИАЛГА ХААГДСАН (ТӨЛӨГДӨӨГҮЙ)</span>
+            </div>
+
+            <h1 className="text-xl sm:text-2xl font-bold text-[#141414]">
+              Энэ захиалга хаагдсан байна
+            </h1>
+
+            <p className="mt-2 text-xs text-zinc-600 max-w-md mx-auto leading-relaxed">
+              Төлбөр төлөгдөөгүй тул гүйлгээ давхардахаас сэргийлж энэ захиалга хаагдсан байна. Та дэлгүүр рүү буцаж хүссэн үедээ шинээр захиалга өгөх боломжтой.
+            </p>
+
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Link
+                href="/shop"
+                className="w-full sm:w-auto py-3.5 px-6 rounded-full bg-[#141414] hover:bg-black text-white font-extrabold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span>🛒 ДЭЛГҮҮР РҮҮ БУЦАХ (ШИНЭЭР ЗАХИАЛАХ)</span>
+              </Link>
+            </div>
+          </div>
         ) : (
           /* PENDING APPROVAL SCREEN */
           <div className="bg-white border border-[#E6E6E3] rounded-2xl p-6 sm:p-8 shadow-xs mb-6">
@@ -486,7 +546,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 )}
 
                 {order.bonumFollowUpLink ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <a
                       href={order.bonumFollowUpLink}
                       className="w-full py-3.5 px-5 rounded-full bg-[#141414] hover:bg-black text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 group"
@@ -495,28 +555,80 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                       <span>BONUM-ЭЭР ТӨЛӨХ (QPAY · КАРТ)</span>
                       <ExternalLink className="w-3.5 h-3.5 opacity-70 ml-1" />
                     </a>
-                    <span className="text-[10px] text-zinc-400 block text-center">
+
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handlePayWithBonum('invoice', true)}
+                        disabled={initiatingBonum}
+                        className="flex-1 py-2 px-3 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 font-semibold text-[11px] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        title="Хэрэв банкны апп-аас гүйлгээ давхардах эрсдэлтэй гэж гарвал шинэ холбоос үүсгэнэ"
+                      >
+                        {initiatingBonum ? (
+                          <>
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>ҮҮСГЭЖ БАЙНА...</span>
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="w-3 h-3 text-amber-600" />
+                            <span>🔄 Шинэ холбоосоор төлөх (Дахин оролдох)</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleCancelOrder}
+                        disabled={cancellingOrder}
+                        className="py-2 px-3 rounded-xl bg-zinc-50 hover:bg-red-50 text-zinc-500 hover:text-red-600 border border-zinc-200 hover:border-red-200 font-semibold text-[11px] transition-colors cursor-pointer flex items-center justify-center gap-1"
+                      >
+                        {cancellingOrder ? (
+                          <>
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>ХААЖ БАЙНА...</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>❌ Захиалга хаах</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <span className="text-[10px] text-zinc-400 block text-center pt-0.5">
                       Нэхэмжлэхийн дугаар: <code className="font-mono text-zinc-600">{order.bonumInvoiceId}</code>
                     </span>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => handlePayWithBonum('invoice')}
-                    disabled={initiatingBonum}
-                    className="w-full py-3.5 px-5 rounded-full bg-[#141414] hover:bg-black disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 group"
-                  >
-                    {initiatingBonum ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 text-[#00B0FF] animate-spin" />
-                        <span>ТӨЛБӨРИЙН ХОЛБООС ҮҮСГЭЖ БАЙНА...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-4 h-4 text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
-                        <span>⚡ BONUM-ЭЭР ШУУД ТӨЛӨХ (QPAY · КАРТ)</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => handlePayWithBonum('invoice')}
+                      disabled={initiatingBonum}
+                      className="w-full py-3.5 px-5 rounded-full bg-[#141414] hover:bg-black disabled:opacity-50 text-white font-bold text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2 group"
+                    >
+                      {initiatingBonum ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 text-[#00B0FF] animate-spin" />
+                          <span>ТӨЛБӨРИЙН ХОЛБООС ҮҮСГЭЖ БАЙНА...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-4 h-4 text-amber-400 fill-amber-400 group-hover:scale-110 transition-transform" />
+                          <span>⚡ BONUM-ЭЭР ШУУД ТӨЛӨХ (QPAY · КАРТ)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCancelOrder}
+                      disabled={cancellingOrder}
+                      className="w-full py-2 px-3 rounded-xl bg-zinc-50 hover:bg-red-50 text-zinc-500 hover:text-red-600 border border-zinc-200 hover:border-red-200 font-semibold text-[11px] transition-colors cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      <span>❌ Энэ захиалгыг хаах (Шинээр захиалах)</span>
+                    </button>
+                  </div>
                 )}
 
                 {/* Optional QR Display if generated */}

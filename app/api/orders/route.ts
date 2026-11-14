@@ -84,6 +84,27 @@ export async function POST(request: Request) {
     const finalPaymentMethod = isFree ? 'FREE_DOWNLOAD' : (paymentMethod || 'KHAN_BANK')
     const finalApprovedAt = isFree ? new Date().toISOString() : null
 
+    // Auto-close previous unpaid PENDING orders for this customer so old pending orders don't pile up or conflict
+    if (!isFree && customerEmail) {
+      try {
+        const allOrders = await db.getOrders(true)
+        const normalized = customerEmail.trim().toLowerCase()
+        const pendingOrders = allOrders.filter(
+          (o) =>
+            o.status === 'PENDING' &&
+            o.customerEmail?.trim().toLowerCase() === normalized
+        )
+        for (const old of pendingOrders) {
+          await db.cancelOrder(
+            old.id,
+            'Төлөгдөөгүй тул шинэ захиалга үүсгэхэд автоматаар хаагдсан'
+          )
+        }
+      } catch (cancelErr) {
+        console.warn('Could not auto-cancel older pending orders:', cancelErr)
+      }
+    }
+
     const order = await db.createOrder({
       customerName: finalCustomerName,
       customerEmail: (customerEmail || '').trim(),
@@ -109,14 +130,10 @@ export async function POST(request: Request) {
     })
 
     // If free, send the approved email directly with download links.
-    // If paid, send the order created/pending email.
+    // If paid, customer email is ONLY sent upon successful payment approval.
     if (isFree) {
       sendOrderApprovedEmail({ order, siteUrl }).catch((err) => {
         console.warn('Order approved email background warning:', err)
-      })
-    } else {
-      sendOrderCreatedEmail({ order, siteUrl }).catch((err) => {
-        console.warn('Order confirmation email background warning:', err)
       })
     }
 

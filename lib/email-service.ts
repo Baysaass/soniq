@@ -552,90 +552,21 @@ async function sendViaResend(params: {
 }
 
 /**
- * Dispatcher to send Order Created (Confirmation & Bank Instructions) Email immediately upon checkout
+ * Dispatcher for Order Created.
+ * Per store requirements, customer emails are NOT sent on pending order creation.
+ * Emails are strictly sent ONLY when an order is approved/paid (sendOrderApprovedEmail).
  */
 export async function sendOrderCreatedEmail(params: {
   order: Order
   siteUrl?: string
 }): Promise<EmailSendResult> {
   const { order } = params
-
-  if (!order.customerEmail || !order.customerEmail.includes('@')) {
-    return {
-      success: false,
-      provider: 'simulated',
-      recipient: order.customerEmail || 'unknown',
-      error: 'Хэрэглэгчийн и-мэйл хаяг тодорхойгүй байна.',
-    }
-  }
-
-  const siteUrl =
-    params.siteUrl ||
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.NODE_ENV === 'production' ? 'https://shop.soniq.click' : 'http://localhost:3000')
-
-  const html = buildOrderCreatedEmailHtml({ order, siteUrl })
-  const subject = `[SONIQ STORE] Захиалга хүлээн авлаа — Төлбөрийн заавар (#${order.id})`
-
-  const settings = getStoreSettings()
-  const resendApiKey = settings.resendApiKey?.trim() || process.env.RESEND_API_KEY?.trim()
-  if (resendApiKey && resendApiKey.length > 0) {
-    const res = await sendViaResend({
-      apiKey: resendApiKey,
-      to: order.customerEmail,
-      subject,
-      html,
-    })
-
-    if (res.success && res.messageId) {
-      saveEmailLog({
-        id: res.messageId,
-        orderId: order.id,
-        recipient: order.customerEmail,
-        subject,
-        sentAt: new Date().toISOString(),
-        provider: 'resend',
-        success: true,
-        html,
-      })
-      return {
-        success: true,
-        provider: 'resend',
-        messageId: res.messageId,
-        recipient: order.customerEmail,
-        previewHtml: html,
-      }
-    } else {
-      const errorMsg = res.error || 'Resend и-мэйл илгээхэд алдаа буцаалаа.'
-      saveEmailLog({
-        id: `err_${Date.now()}`,
-        orderId: order.id,
-        recipient: order.customerEmail,
-        subject,
-        sentAt: new Date().toISOString(),
-        provider: 'resend-failed',
-        success: false,
-        error: errorMsg,
-        html,
-      })
-      return {
-        success: false,
-        provider: 'resend-failed',
-        error: errorMsg,
-        recipient: order.customerEmail,
-        previewHtml: html,
-      }
-    }
-  }
-
-  const mockId = `sim_${Date.now()}`
+  console.log(`[Email Service] Order ${order.id} created as PENDING. Skipping email dispatch (emails only sent on payment approval).`)
   return {
-    success: false,
-    provider: 'not-configured',
-    error: 'RESEND_API_KEY тохируулагдаагүй байна. Админ "Тохиргоо" цэснээс эсвэл Vercel дээр RESEND_API_KEY оруулна уу.',
-    messageId: mockId,
-    recipient: order.customerEmail,
-    previewHtml: html,
+    success: true,
+    provider: 'simulated',
+    recipient: order.customerEmail || 'unknown',
+    messageId: `skipped-pending-${order.id}`,
   }
 }
 

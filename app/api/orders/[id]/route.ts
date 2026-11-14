@@ -85,3 +85,46 @@ export async function GET(
     return NextResponse.json({ error: 'Алдаа гарлаа' }, { status: 500 })
   }
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const body = await request.json().catch(() => ({}))
+    const { action } = body
+
+    const order = await db.getOrderById(id)
+    if (!order) {
+      return NextResponse.json({ error: 'Захиалга олдсонгүй' }, { status: 404 })
+    }
+
+    if (action === 'cancel') {
+      if (order.status === 'APPROVED') {
+        return NextResponse.json(
+          { error: 'Баталгаажсан захиалгыг цуцлах боломжгүй.' },
+          { status: 400 }
+        )
+      }
+
+      const cancelled = await db.cancelOrder(
+        id,
+        body.reason || 'Төлбөр төлөгдөөгүй тул хэрэглэгч эсвэл систем хаасан'
+      )
+
+      return NextResponse.json({
+        success: true,
+        order: cancelled || { ...order, status: 'CANCELLED' },
+      })
+    }
+
+    return NextResponse.json({ error: 'Үйлдэл тодорхойгүй байна.' }, { status: 400 })
+  } catch (error: any) {
+    console.error('Error updating order:', error)
+    return NextResponse.json(
+      { error: error?.message || 'Захиалга шинэчлэхэд алдаа гарлаа' },
+      { status: 500 }
+    )
+  }
+}

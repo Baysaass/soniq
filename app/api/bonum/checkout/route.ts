@@ -25,11 +25,44 @@ export async function POST(request: Request) {
       totalAmountUSD,
       currency,
       mode = 'invoice', // 'invoice' | 'qr'
+      forceNew = false,
     } = body
 
     const siteUrl = new URL(request.url).origin
 
     let order = orderId ? await db.getOrderById(orderId) : null
+
+    // If order is already cancelled, don't allow re-charging on it
+    if (order && order.status === 'CANCELLED') {
+      return NextResponse.json(
+        {
+          error: 'Энэ захиалга төлөгдөөгүй тул хаагдсан байна. Та шинэ захиалга үүсгэнэ үү.',
+          status: 'CANCELLED',
+        },
+        { status: 400 }
+      )
+    }
+
+    // Auto-close any older unpaid PENDING orders for this customer to prevent duplicate payments
+    if (!order && customerEmail) {
+      try {
+        const allOrders = await db.getOrders(true)
+        const normalized = customerEmail.trim().toLowerCase()
+        const pendingOrders = allOrders.filter(
+          (o) =>
+            o.status === 'PENDING' &&
+            o.customerEmail?.trim().toLowerCase() === normalized
+        )
+        for (const old of pendingOrders) {
+          await db.cancelOrder(
+            old.id,
+            'Төлөгдөөгүй тул шинэ захиалга үүсгэхэд автоматаар хаагдсан'
+          )
+        }
+      } catch (cancelErr) {
+        console.warn('Error auto-cancelling older pending orders:', cancelErr)
+      }
+    }
 
     // If order does not exist yet, create one
     if (!order) {
@@ -89,9 +122,7 @@ export async function POST(request: Request) {
         console.warn('Telegram notification warning:', err)
       })
 
-      sendOrderCreatedEmail({ order, siteUrl }).catch((err) => {
-        console.warn('Order confirmation email warning:', err)
-      })
+      // Note: Gmail is ONLY dispatched when order is approved/paid (sendOrderApprovedEmail).
     }
 
     if (!order) {
@@ -112,8 +143,8 @@ export async function POST(request: Request) {
       })
     }
 
-    // Reuse existing followUpLink if already generated for this order
-    if (mode === 'invoice' && order.bonumFollowUpLink) {
+    // Reuse existing followUpLink only if NOT forceNew and already generated
+    if (!forceNew && mode === 'invoice' && order.bonumFollowUpLink) {
       return NextResponse.json({
         success: true,
         mode: 'invoice',
@@ -123,10 +154,8 @@ export async function POST(request: Request) {
       })
     }
 
-    // Generate unique transactionId for retry attempts to avoid 409 conflict
-    const txId = order.bonumInvoiceId
-      ? `${order.id}_${Date.now().toString(36)}`
-      : order.id
+    // ALWAYS generate a unique transactionId with timestamp so Bonum, QPay, and banking apps NEVER complain about duplicate transactions!
+    const txId = `${order.id}_${Date.now().toString(36)}`
 
     // 1. If QR mode requested
     if (mode === 'qr') {
