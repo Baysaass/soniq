@@ -81,7 +81,67 @@ function mapProductRow(row: any): StoreProduct {
   }
 }
 
+// Extract Bonum metadata from order row
+function extractBonumMetadata(row: any) {
+  let bonumInvoiceId = row.bonum_invoice_id || undefined
+  let bonumFollowUpLink = row.bonum_follow_up_link || undefined
+  let bonumQrCode = row.bonum_qr_code || undefined
+  let bonumQrImage = row.bonum_qr_image || undefined
+  let bonumQrLinks = row.bonum_qr_links || undefined
+  let cleanAdminNotes = row.admin_notes || ''
+
+  if (typeof cleanAdminNotes === 'string' && cleanAdminNotes.includes('<!--BONUM_META:')) {
+    const match = cleanAdminNotes.match(/<!--BONUM_META:(.*?)-->/)
+    if (match) {
+      try {
+        const meta = JSON.parse(match[1])
+        if (!bonumInvoiceId && meta.invoiceId) bonumInvoiceId = meta.invoiceId
+        if (!bonumFollowUpLink && meta.followUpLink) bonumFollowUpLink = meta.followUpLink
+        if (!bonumQrCode && meta.qrCode) bonumQrCode = meta.qrCode
+        if (!bonumQrImage && meta.qrImage) bonumQrImage = meta.qrImage
+        if (!bonumQrLinks && meta.qrLinks) bonumQrLinks = meta.qrLinks
+      } catch {}
+      cleanAdminNotes = cleanAdminNotes.replace(/<!--BONUM_META:(.*?)-->/g, '').trim()
+    }
+  }
+
+  if (!bonumInvoiceId && (row.payment_method === 'BONUM' || row.paymentMethod === 'BONUM')) {
+    const ref = row.transfer_reference || row.transferReference
+    if (ref && ref !== row.id && !ref.startsWith('SQ-')) {
+      bonumInvoiceId = ref
+    }
+  }
+
+  return {
+    bonumInvoiceId,
+    bonumFollowUpLink,
+    bonumQrCode,
+    bonumQrImage,
+    bonumQrLinks,
+    cleanAdminNotes,
+  }
+}
+
+function injectBonumMetadata(
+  adminNotes: string = '',
+  bonum: {
+    invoiceId?: string
+    followUpLink?: string
+    qrCode?: string
+    qrImage?: string
+    qrLinks?: any[]
+  }
+): string {
+  if (!bonum.invoiceId && !bonum.followUpLink && !bonum.qrCode) {
+    return adminNotes || ''
+  }
+  const base = (adminNotes || '').replace(/<!--BONUM_META:(.*?)-->/g, '').trim()
+  const metaStr = `<!--BONUM_META:${JSON.stringify(bonum)}-->`
+  return base ? `${base}\n${metaStr}` : metaStr
+}
+
 function mapOrderRow(row: any): Order {
+  const bonum = extractBonumMetadata(row)
   return {
     id: row.id,
     createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
@@ -100,7 +160,12 @@ function mapOrderRow(row: any): Order {
     weTransferLink: row.wetransfer_link || '',
     r2Key: row.r2_key || '',
     approvedAt: row.approved_at ? new Date(row.approved_at).toISOString() : null,
-    adminNotes: row.admin_notes || '',
+    adminNotes: bonum.cleanAdminNotes,
+    bonumInvoiceId: bonum.bonumInvoiceId,
+    bonumFollowUpLink: bonum.bonumFollowUpLink,
+    bonumQrCode: bonum.bonumQrCode,
+    bonumQrImage: bonum.bonumQrImage,
+    bonumQrLinks: bonum.bonumQrLinks,
   }
 }
 
@@ -327,6 +392,19 @@ export const postgresDB = {
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW()
         ) RETURNING *
       `
+      let transferRef = order.transferReference || orderId
+      if (order.paymentMethod === 'BONUM' && order.bonumInvoiceId) {
+        transferRef = order.bonumInvoiceId
+      }
+
+      const packedAdminNotes = injectBonumMetadata(order.adminNotes || '', {
+        invoiceId: order.bonumInvoiceId,
+        followUpLink: order.bonumFollowUpLink,
+        qrCode: order.bonumQrCode,
+        qrImage: order.bonumQrImage,
+        qrLinks: order.bonumQrLinks,
+      })
+
       const values = [
         orderId,
         (order.customerName || 'Захиалагч').trim(),
@@ -339,12 +417,12 @@ export const postgresDB = {
         order.currency || 'MNT',
         order.status || 'PENDING',
         order.paymentMethod || 'KHAN_BANK',
-        order.transferReference || orderId,
+        transferRef,
         (order.receiptNote || '').trim(),
         (order.weTransferLink || '').trim(),
         (order.r2Key || '').trim(),
         order.approvedAt || null,
-        (order.adminNotes || '').trim(),
+        packedAdminNotes,
       ]
       const res = await pool.query(query, values)
       return mapOrderRow(res.rows[0])
@@ -362,10 +440,24 @@ export const postgresDB = {
       if (!current) return null
       const merged = { ...current, ...updates }
 
+      let transferRef = merged.transferReference
+      if (updates.bonumInvoiceId && (!transferRef || transferRef === current.id)) {
+        transferRef = updates.bonumInvoiceId
+      }
+
+      const packedAdminNotes = injectBonumMetadata(merged.adminNotes || '', {
+        invoiceId: merged.bonumInvoiceId,
+        followUpLink: merged.bonumFollowUpLink,
+        qrCode: merged.bonumQrCode,
+        qrImage: merged.bonumQrImage,
+        qrLinks: merged.bonumQrLinks,
+      })
+
       const query = `
         UPDATE orders SET
           status = $2, wetransfer_link = $3, r2_key = $4,
-          approved_at = $5, admin_notes = $6
+          approved_at = $5, admin_notes = $6,
+          payment_method = $7, transfer_reference = $8
         WHERE id = $1
         RETURNING *
       `
@@ -375,7 +467,9 @@ export const postgresDB = {
         merged.weTransferLink,
         merged.r2Key,
         merged.approvedAt,
-        merged.adminNotes,
+        packedAdminNotes,
+        merged.paymentMethod,
+        transferRef,
       ]
       const res = await pool.query(query, values)
       return mapOrderRow(res.rows[0])

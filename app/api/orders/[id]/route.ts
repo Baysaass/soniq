@@ -19,19 +19,30 @@ export async function GET(
     // ACTIVE BONUM VERIFICATION:
     // If order is still PENDING and has a Bonum invoice, actively check Bonum's API
     // This guarantees immediate unlocking of downloads even if webhook was delayed!
-    if (order.status === 'PENDING' && order.bonumInvoiceId) {
+    const bonumInv =
+      order.bonumInvoiceId ||
+      (order.paymentMethod === 'BONUM' &&
+      order.transferReference &&
+      !order.transferReference.startsWith('SQ-')
+        ? order.transferReference
+        : '')
+
+    if (order.status === 'PENDING' && bonumInv) {
       try {
         const client = getBonumGatewayClient()
-        const invoiceData: any = await client.getInvoice(order.bonumInvoiceId)
-        if (
+        const invoiceData: any = await client.getInvoice(bonumInv)
+        const isPaid =
           invoiceData &&
           (invoiceData.status === 'SUCCESS' ||
             invoiceData.status === 'PAID' ||
             invoiceData.status === 'APPROVED' ||
             (invoiceData.paymentVendor &&
               invoiceData.status !== 'FAILED' &&
-              invoiceData.status !== 'CANCELLED'))
-        ) {
+              invoiceData.status !== 'CANCELLED') ||
+            (Number(invoiceData.paidAmount) > 0 &&
+              Number(invoiceData.paidAmount) >= Number(order.totalAmountMNT)))
+
+        if (isPaid) {
           const siteUrl = new URL(request.url).origin
           const settings = await db.getSettings().catch(() => null)
           const fallbackLink = order.weTransferLink || settings?.defaultBundleWeTransfer || ''
@@ -39,7 +50,7 @@ export async function GET(
           const approved = await db.approveOrder(
             order.id,
             fallbackLink,
-            `Bonum-ээр шууд шалгагдаж баталгаажсан (Нэхэмжлэх: ${order.bonumInvoiceId})`,
+            `Bonum-ээр шууд шалгагдаж баталгаажсан (Нэхэмжлэх: ${bonumInv})`,
             order.r2Key
           )
 

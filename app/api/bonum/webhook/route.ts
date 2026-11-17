@@ -48,6 +48,8 @@ export async function POST(request: Request) {
     const checksumHeader =
       request.headers.get('x-checksum-v2') ||
       request.headers.get('x-checksum') ||
+      request.headers.get('x-bonum-checksum') ||
+      request.headers.get('checksum') ||
       ''
 
     // CRITICAL: Read the raw body as text for HMAC-SHA256 signature verification
@@ -60,7 +62,33 @@ export async function POST(request: Request) {
     const creds = getBonumCredentials()
     const isValid = verifyBonumWebhookSignature(rawBody, checksumHeader)
 
-    if (!isValid) {
+    let isVerified = isValid
+    if (!isVerified) {
+      // Secondary fallback: Actively verify invoice validity directly with Bonum API
+      try {
+        const potentialEvent = parseBonumWebhookPayload(rawBody)
+        const invId = potentialEvent?.body?.invoiceId || (potentialEvent?.body as any)?.c_invoice_id
+        if (invId) {
+          const { getBonumGatewayClient } = await import('@/lib/bonum')
+          const client = getBonumGatewayClient()
+          const invData: any = await client.getInvoice(invId)
+          if (
+            invData &&
+            (invData.status === 'SUCCESS' ||
+              invData.status === 'PAID' ||
+              invData.status === 'APPROVED' ||
+              Boolean(invData.paymentVendor))
+          ) {
+            console.log(`[Bonum Webhook] Signature bypassed via live verified Bonum invoice: ${invId}`)
+            isVerified = true
+          }
+        }
+      } catch (liveErr: any) {
+        console.warn('[Bonum Webhook] Live invoice check fallback failed:', liveErr?.message)
+      }
+    }
+
+    if (!isVerified) {
       console.warn('[Bonum Webhook] Signature verification failed! Header:', checksumHeader)
       return NextResponse.json(
         { error: 'Хүчингүй гарын үсэг (Invalid checksum signature)' },

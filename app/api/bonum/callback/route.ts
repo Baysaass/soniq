@@ -20,25 +20,56 @@ export async function GET(request: Request) {
   const orderId =
     url.searchParams.get('orderId') ||
     url.searchParams.get('order_id') ||
-    url.searchParams.get('transactionId') ||
-    url.searchParams.get('txn') ||
     url.searchParams.get('id') ||
     ''
 
-  const invoiceId = url.searchParams.get('invoiceId') || ''
+  const txn =
+    url.searchParams.get('txn') ||
+    url.searchParams.get('transactionId') ||
+    url.searchParams.get('merchant_transaction_id') ||
+    ''
 
-  if (!orderId && !invoiceId) {
+  const invoiceId =
+    url.searchParams.get('invoiceId') ||
+    url.searchParams.get('c_invoice_id') ||
+    url.searchParams.get('invoice_id') ||
+    ''
+
+  const queryStatus = (
+    url.searchParams.get('status') ||
+    url.searchParams.get('paymentStatus') ||
+    url.searchParams.get('transStatus') ||
+    url.searchParams.get('result') ||
+    ''
+  ).toUpperCase()
+
+  if (!orderId && !txn && !invoiceId) {
     return NextResponse.redirect(`${siteUrl}/shop`)
   }
 
-  // Find order
+  // 1. Find order by orderId
   let order = orderId ? await db.getOrderById(orderId) : null
+
+  // 2. Fallback: Strip retry suffix (SQ-85857_abc -> SQ-85857)
   if (!order && orderId && orderId.includes('_')) {
     order = await db.getOrderById(orderId.split('_')[0])
   }
+
+  // 3. Fallback: Find by transactionId
+  if (!order && txn) {
+    const cleanTxn = txn.includes('_') ? txn.split('_')[0] : txn
+    order = (await db.getOrderById(txn)) || (await db.getOrderById(cleanTxn))
+  }
+
+  // 4. Fallback: Find by invoiceId
   if (!order && invoiceId) {
     const allOrders = await db.getOrders(true)
-    order = allOrders.find((o) => o.bonumInvoiceId === invoiceId) || null
+    order =
+      allOrders.find(
+        (o) =>
+          o.bonumInvoiceId === invoiceId ||
+          o.transferReference === invoiceId
+      ) || null
   }
 
   if (!order) {
@@ -51,20 +82,34 @@ export async function GET(request: Request) {
   }
 
   // Active check against Bonum API
-  const invId = order.bonumInvoiceId || invoiceId
+  const invId =
+    order.bonumInvoiceId ||
+    (order.transferReference && !order.transferReference.startsWith('SQ-')
+      ? order.transferReference
+      : '') ||
+    invoiceId
+
+  let approvedDirectly = false
+
   if (invId) {
     try {
       const client = getBonumGatewayClient()
       const invoiceData: any = await client.getInvoice(invId)
-      if (
+      console.log(`[Bonum Callback] getInvoice(${invId}) response:`, invoiceData)
+
+      const isPaid =
         invoiceData &&
         (invoiceData.status === 'SUCCESS' ||
           invoiceData.status === 'PAID' ||
           invoiceData.status === 'APPROVED' ||
           (invoiceData.paymentVendor &&
             invoiceData.status !== 'FAILED' &&
-            invoiceData.status !== 'CANCELLED'))
-      ) {
+            invoiceData.status !== 'CANCELLED') ||
+          (Number(invoiceData.paidAmount) > 0 &&
+            Number(invoiceData.paidAmount) >= Number(order.totalAmountMNT)))
+
+      if (isPaid) {
+        approvedDirectly = true
         const settings = await db.getSettings().catch(() => null)
         const fallbackLink = order.weTransferLink || settings?.defaultBundleWeTransfer || ''
 
@@ -83,6 +128,29 @@ export async function GET(request: Request) {
       }
     } catch (err: any) {
       console.warn('[Bonum Callback] getInvoice check warning:', err?.message)
+    }
+  }
+
+  // If getInvoice didn't trigger approval but query parameter explicitly confirms SUCCESS
+  if (
+    !approvedDirectly &&
+    order.status === 'PENDING' &&
+    (queryStatus === 'SUCCESS' || queryStatus === 'PAID' || queryStatus === 'APPROVED')
+  ) {
+    const settings = await db.getSettings().catch(() => null)
+    const fallbackLink = order.weTransferLink || settings?.defaultBundleWeTransfer || ''
+
+    const approved = await db.approveOrder(
+      order.id,
+      fallbackLink,
+      `Bonum callback status=${queryStatus}-ээр шууд баталгаажсан`,
+      order.r2Key
+    )
+
+    if (approved) {
+      order = approved
+      sendOrderApprovedEmail({ order, siteUrl }).catch(console.warn)
+      sendTelegramOrderApprovedNotification(order, true, siteUrl).catch(console.warn)
     }
   }
 

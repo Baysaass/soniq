@@ -175,6 +175,7 @@ export async function POST(request: Request) {
         const qrRes = await createBonumQr({ order, transactionId: txId })
         await db.updateOrder(order.id, {
           paymentMethod: 'BONUM',
+          transferReference: qrRes.invoiceId,
           bonumInvoiceId: qrRes.invoiceId,
           bonumQrCode: qrRes.qrCode,
           bonumQrImage: qrRes.qrImage,
@@ -205,6 +206,7 @@ export async function POST(request: Request) {
 
     await db.updateOrder(order.id, {
       paymentMethod: 'BONUM',
+      transferReference: invoiceRes.invoiceId,
       bonumInvoiceId: invoiceRes.invoiceId,
       bonumFollowUpLink: invoiceRes.followUpLink,
     })

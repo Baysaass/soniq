@@ -134,8 +134,69 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
 }
 
 
+// Extract Bonum metadata from order row (from columns, admin_notes comment, or transfer_reference)
+function extractBonumMetadata(row: any) {
+  let bonumInvoiceId = row.bonum_invoice_id || undefined
+  let bonumFollowUpLink = row.bonum_follow_up_link || undefined
+  let bonumQrCode = row.bonum_qr_code || undefined
+  let bonumQrImage = row.bonum_qr_image || undefined
+  let bonumQrLinks = row.bonum_qr_links || undefined
+  let cleanAdminNotes = row.admin_notes || ''
+
+  if (typeof cleanAdminNotes === 'string' && cleanAdminNotes.includes('<!--BONUM_META:')) {
+    const match = cleanAdminNotes.match(/<!--BONUM_META:(.*?)-->/)
+    if (match) {
+      try {
+        const meta = JSON.parse(match[1])
+        if (!bonumInvoiceId && meta.invoiceId) bonumInvoiceId = meta.invoiceId
+        if (!bonumFollowUpLink && meta.followUpLink) bonumFollowUpLink = meta.followUpLink
+        if (!bonumQrCode && meta.qrCode) bonumQrCode = meta.qrCode
+        if (!bonumQrImage && meta.qrImage) bonumQrImage = meta.qrImage
+        if (!bonumQrLinks && meta.qrLinks) bonumQrLinks = meta.qrLinks
+      } catch {}
+      cleanAdminNotes = cleanAdminNotes.replace(/<!--BONUM_META:(.*?)-->/g, '').trim()
+    }
+  }
+
+  // If bonumInvoiceId is still missing and payment_method is BONUM, check transfer_reference
+  if (!bonumInvoiceId && (row.payment_method === 'BONUM' || row.paymentMethod === 'BONUM')) {
+    const ref = row.transfer_reference || row.transferReference
+    if (ref && ref !== row.id && !ref.startsWith('SQ-')) {
+      bonumInvoiceId = ref
+    }
+  }
+
+  return {
+    bonumInvoiceId,
+    bonumFollowUpLink,
+    bonumQrCode,
+    bonumQrImage,
+    bonumQrLinks,
+    cleanAdminNotes,
+  }
+}
+
+function injectBonumMetadata(
+  adminNotes: string = '',
+  bonum: {
+    invoiceId?: string
+    followUpLink?: string
+    qrCode?: string
+    qrImage?: string
+    qrLinks?: any[]
+  }
+): string {
+  if (!bonum.invoiceId && !bonum.followUpLink && !bonum.qrCode) {
+    return adminNotes || ''
+  }
+  const base = (adminNotes || '').replace(/<!--BONUM_META:(.*?)-->/g, '').trim()
+  const metaStr = `<!--BONUM_META:${JSON.stringify(bonum)}-->`
+  return base ? `${base}\n${metaStr}` : metaStr
+}
+
 // Convert DB snake_case order row to Order
 function mapOrderRow(row: any): Order {
+  const bonum = extractBonumMetadata(row)
   return {
     id: row.id,
     createdAt: row.created_at || new Date().toISOString(),
@@ -154,13 +215,31 @@ function mapOrderRow(row: any): Order {
     weTransferLink: row.wetransfer_link || '',
     r2Key: row.r2_key || '',
     approvedAt: row.approved_at || null,
-    adminNotes: row.admin_notes || '',
+    adminNotes: bonum.cleanAdminNotes,
+    bonumInvoiceId: bonum.bonumInvoiceId,
+    bonumFollowUpLink: bonum.bonumFollowUpLink,
+    bonumQrCode: bonum.bonumQrCode,
+    bonumQrImage: bonum.bonumQrImage,
+    bonumQrLinks: bonum.bonumQrLinks,
   }
 }
 
 // Convert Order for creation to DB row (ensuring id and required constraints)
 function mapOrderCreateToRow(order: Partial<Order>): Record<string, any> {
   const orderId = order.id || `SQ-${Math.floor(10000 + Math.random() * 90000)}`
+  let transferRef = order.transferReference || orderId
+  if (order.paymentMethod === 'BONUM' && order.bonumInvoiceId) {
+    transferRef = order.bonumInvoiceId
+  }
+
+  const packedAdminNotes = injectBonumMetadata(order.adminNotes, {
+    invoiceId: order.bonumInvoiceId,
+    followUpLink: order.bonumFollowUpLink,
+    qrCode: order.bonumQrCode,
+    qrImage: order.bonumQrImage,
+    qrLinks: order.bonumQrLinks,
+  })
+
   const row: Record<string, any> = {
     id: orderId,
     customer_name: (order.customerName || 'Захиалагч').trim(),
@@ -173,11 +252,11 @@ function mapOrderCreateToRow(order: Partial<Order>): Record<string, any> {
     currency: order.currency || 'MNT',
     status: order.status || 'PENDING',
     payment_method: order.paymentMethod || 'KHAN_BANK',
-    transfer_reference: order.transferReference || orderId,
+    transfer_reference: transferRef,
     receipt_note: (order.receiptNote || '').trim(),
     wetransfer_link: (order.weTransferLink || '').trim(),
     r2_key: (order.r2Key || '').trim(),
-    admin_notes: (order.adminNotes || '').trim(),
+    admin_notes: packedAdminNotes,
     created_at: order.createdAt || new Date().toISOString(),
   }
   if (order.approvedAt) {
@@ -187,7 +266,7 @@ function mapOrderCreateToRow(order: Partial<Order>): Record<string, any> {
 }
 
 // Convert Order updates to DB row (only defined fields)
-function mapOrderUpdatesToRow(updates: Partial<Order>): Record<string, any> {
+function mapOrderUpdatesToRow(updates: Partial<Order>, existingNotes?: string): Record<string, any> {
   const row: Record<string, any> = {}
   if (updates.customerName !== undefined) row.customer_name = updates.customerName
   if (updates.customerEmail !== undefined) row.customer_email = updates.customerEmail
@@ -204,7 +283,30 @@ function mapOrderUpdatesToRow(updates: Partial<Order>): Record<string, any> {
   if (updates.weTransferLink !== undefined) row.wetransfer_link = updates.weTransferLink
   if (updates.r2Key !== undefined) row.r2_key = updates.r2Key
   if (updates.approvedAt !== undefined) row.approved_at = updates.approvedAt
-  if (updates.adminNotes !== undefined) row.admin_notes = updates.adminNotes
+
+  const hasBonumUpdates =
+    updates.bonumInvoiceId !== undefined ||
+    updates.bonumFollowUpLink !== undefined ||
+    updates.bonumQrCode !== undefined ||
+    updates.bonumQrImage !== undefined ||
+    updates.bonumQrLinks !== undefined
+
+  if (hasBonumUpdates) {
+    if (updates.bonumInvoiceId && !row.transfer_reference) {
+      row.transfer_reference = updates.bonumInvoiceId
+    }
+    const currentNotes = updates.adminNotes !== undefined ? updates.adminNotes : (existingNotes || '')
+    row.admin_notes = injectBonumMetadata(currentNotes, {
+      invoiceId: updates.bonumInvoiceId,
+      followUpLink: updates.bonumFollowUpLink,
+      qrCode: updates.bonumQrCode,
+      qrImage: updates.bonumQrImage,
+      qrLinks: updates.bonumQrLinks,
+    })
+  } else if (updates.adminNotes !== undefined) {
+    row.admin_notes = updates.adminNotes
+  }
+
   return row
 }
 
@@ -231,9 +333,9 @@ async function executeSupabaseWithSelfHealing(
     // e.g.: column "notice" of relation "products" does not exist
     // Could not find the 'notice' column of 'products' in the schema cache
     const missingColMatch =
-      errMsg.match(/column ["']?([a-zA-Z0-9_]+)["']? of relation ["']?products["']? does not exist/i) ||
-      errMsg.match(/Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column of ['"]?products['"]? in the schema cache/i) ||
-      errMsg.match(/column products\.([a-zA-Z0-9_]+) does not exist/i)
+      errMsg.match(/column ["']?([a-zA-Z0-9_]+)["']? of relation ["']?(products|orders|store_settings)["']? does not exist/i) ||
+      errMsg.match(/Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column of ['"]?(products|orders|store_settings)['"]? in the schema cache/i) ||
+      errMsg.match(/column (?:products|orders|store_settings)\.([a-zA-Z0-9_]+) does not exist/i)
 
     if (missingColMatch && missingColMatch[1]) {
       const colName = missingColMatch[1]
@@ -456,12 +558,32 @@ export const supabaseDB = {
   async updateOrder(id: string, updates: Partial<Order>): Promise<Order | null> {
     const supabase = getSupabaseClient()
     if (!supabase) return null
-    const row = mapOrderUpdatesToRow(updates)
-    const { data, error } = await supabase.from('orders').update(row).eq('id', id).select('*').single()
-    if (error) {
-      console.error('Supabase updateOrder error:', error)
-      throw new Error(`Supabase updateOrder алдаа: ${error.message}`)
-    }
+
+    let existingNotes = ''
+    try {
+      const { data: existing } = await supabase
+        .from('orders')
+        .select('admin_notes, transfer_reference')
+        .eq('id', id)
+        .maybeSingle()
+      if (existing) {
+        existingNotes = existing.admin_notes || ''
+        if (
+          !updates.transferReference &&
+          updates.bonumInvoiceId &&
+          (!existing.transfer_reference || existing.transfer_reference === id)
+        ) {
+          updates.transferReference = updates.bonumInvoiceId
+        }
+      }
+    } catch {}
+
+    const row = mapOrderUpdatesToRow(updates, existingNotes)
+    const data = await executeSupabaseWithSelfHealing(
+      (r) => supabase.from('orders').update(r).eq('id', id).select('*').single(),
+      row
+    )
+    if (!data) return null
     return mapOrderRow(data)
   },
 

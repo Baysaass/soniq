@@ -182,10 +182,10 @@ export async function createBonumInvoice(params: {
   const { order } = params
   const client = getBonumGatewayClient()
   const siteUrl = params.siteUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://shop.soniq.click'
-  const callbackUrl = `${siteUrl}/api/bonum/callback?orderId=${encodeURIComponent(order.id)}`
   const transactionId = (
     params.transactionId || `${order.id}_${Date.now().toString(36)}`
   ).slice(0, 60)
+  const callbackUrl = `${siteUrl}/api/bonum/callback?orderId=${encodeURIComponent(order.id)}&txn=${encodeURIComponent(transactionId)}`
 
   // Format line items with required fields (title, amount, count, remark, image)
   // Bonum MySQL table constraints: c_title <= 100, c_remark <= 100, c_img <= 1000
