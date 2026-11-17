@@ -619,6 +619,7 @@ export const supabaseDB = {
       telegramChatId: bankInfo.telegramChatId || '',
       resendApiKey: bankInfo.resendApiKey || '',
       emailFrom: bankInfo.emailFrom || '',
+      usdExchangeRate: Number(data.usd_exchange_rate) || Number(bankInfo.usdExchangeRate) || undefined,
     }
   },
 
@@ -651,6 +652,7 @@ export const supabaseDB = {
         ...(settings.resendApiKey !== undefined ? { resendApiKey: settings.resendApiKey } : {}),
         ...(settings.emailFrom !== undefined ? { emailFrom: settings.emailFrom } : {}),
         ...(settings.r2Config !== undefined ? { r2Config: settings.r2Config } : {}),
+        ...(settings.usdExchangeRate !== undefined ? { usdExchangeRate: settings.usdExchangeRate } : {}),
       }
     }
     if (settings.defaultBundleWeTransfer !== undefined) row.default_bundle_wetransfer = settings.defaultBundleWeTransfer

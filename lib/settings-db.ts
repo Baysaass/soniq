@@ -42,6 +42,7 @@ export interface StoreSettingsType {
     telegramChatId?: string
   }
   defaultBundleWeTransfer: string
+  usdExchangeRate?: number
   r2Config?: R2Config
   bonumConfig?: BonumConfig
   telegramBotToken?: string

@@ -79,6 +79,7 @@ interface StoreSettingsState {
     supportTelegram: string
   }
   defaultBundleWeTransfer: string
+  usdExchangeRate?: number
   r2Config: {
     accountId: string
     accessKeyId: string
@@ -164,6 +165,7 @@ export default function AdminPage() {
     ...STORE_SETTINGS,
     categories: DEFAULT_STORE_CATEGORIES,
     announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
+    usdExchangeRate: undefined,
     r2Config: {
       accountId: '',
       accessKeyId: '',
@@ -216,6 +218,31 @@ export default function AdminPage() {
   const [passwordChangeLoading, setPasswordChangeLoading] = useState(false)
   const [passwordChangeMessage, setPasswordChangeMessage] = useState<{ success: boolean; text: string } | null>(null)
 
+  // Live Exchange Rate State (USD / MNT)
+  const [exchangeRate, setExchangeRate] = useState<number>(3605)
+  const [rateLoading, setRateLoading] = useState<boolean>(false)
+  const [rateSource, setRateSource] = useState<'live' | 'custom' | 'fallback'>('live')
+  const [rateLastUpdated, setRateLastUpdated] = useState<string>('')
+
+  const fetchExchangeRate = async () => {
+    setRateLoading(true)
+    try {
+      const res = await fetch('/api/exchange-rate')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.rate && typeof data.rate === 'number' && data.rate > 0) {
+          setExchangeRate(data.rate)
+          setRateSource(data.source || 'live')
+          setRateLastUpdated(new Date().toLocaleTimeString('mn-MN', { hour: '2-digit', minute: '2-digit' }))
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch exchange rate:', err)
+    } finally {
+      setRateLoading(false)
+    }
+  }
+
   // Fetch Email Status
   const fetchEmailStatus = async (codeToUse?: string) => {
     const pc = codeToUse || passcode
@@ -249,6 +276,7 @@ export default function AdminPage() {
 
   // Check persisted login
   useEffect(() => {
+    fetchExchangeRate()
     const saved = sessionStorage.getItem('soniq_admin_passcode')
     if (saved) {
       // Validate saved passcode
@@ -289,6 +317,7 @@ export default function AdminPage() {
         setIsAuthenticated(true)
         sessionStorage.setItem('soniq_admin_passcode', passcode)
         setAuthError('')
+        fetchExchangeRate()
         fetchProducts()
         fetchOrders(passcode)
         fetchSettings(passcode)
@@ -474,6 +503,7 @@ export default function AdminPage() {
             telegramChatId: data.settings.telegramChatId || data.settings.bankInfo?.telegramChatId || '',
             resendApiKey: data.settings.resendApiKey || '',
             emailFrom: data.settings.emailFrom || '',
+            usdExchangeRate: data.settings.usdExchangeRate !== undefined ? Number(data.settings.usdExchangeRate) : prev.usdExchangeRate,
             categories: (data.settings.categories && data.settings.categories.length > 0)
               ? data.settings.categories
               : (prev.categories && prev.categories.length > 0 ? prev.categories : DEFAULT_STORE_CATEGORIES),
@@ -561,6 +591,9 @@ export default function AdminPage() {
   // Open Product Modal (New or Edit)
   const openNewProductModal = () => {
     setShowR2InModal(false)
+    const rate = exchangeRate > 0 ? exchangeRate : 3600
+    const defMNT = 29900
+    const defOrigMNT = 89000
     setEditingProduct({
       id: '',
       title: '',
@@ -569,10 +602,10 @@ export default function AdminPage() {
       description: '',
       category: 'sfx',
       badge: 'NEW',
-      priceMNT: 29900,
-      originalPriceMNT: 89000,
-      priceUSD: 9.99,
-      originalPriceUSD: 29.0,
+      priceMNT: defMNT,
+      originalPriceMNT: defOrigMNT,
+      priceUSD: Number((defMNT / rate).toFixed(2)),
+      originalPriceUSD: Number((defOrigMNT / rate).toFixed(2)),
       image: '',
       images: [],
       fileSize: '',
@@ -2341,6 +2374,64 @@ export default function AdminPage() {
                 )}
               </div>
 
+              {/* USD / MNT Exchange Rate Setting */}
+              <div className="p-4 bg-[#FAFAFA] rounded-xl border border-[#E6E6E3] space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-zinc-800 text-xs">
+                    <TrendingUp className="w-4 h-4 text-emerald-600" />
+                    <span>Ам.долларын ханш (USD / MNT Exchange Rate)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold">
+                      Одоогийн ханш: 1$ = {Math.round(exchangeRate).toLocaleString()}₮
+                    </span>
+                    <button
+                      type="button"
+                      onClick={fetchExchangeRate}
+                      disabled={rateLoading}
+                      className="text-[11px] text-zinc-500 hover:text-zinc-800 flex items-center gap-1 cursor-pointer"
+                      title="Шууд ханшийг шинэчлэх"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${rateLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  Бүтээгдэхүүн нэмэх, засах үед ₮ үнэ бичихэд ам.долларын үнэ рүү тухайн үеийн шууд ханшаар автоматаар хөрвөнө. Хэрэв та тогтмол ханш тохируулахыг хүсвэл доор гараар оруулна уу (хоосон орхивол зах зээлийн шууд ханшийг автоматаар ашиглана).
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+                      Гараар тогтоох ханш (1 USD = ? ₮)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      placeholder={`Жишээ: ${Math.round(exchangeRate)} (Хоосон бол шууд ханш)`}
+                      value={settings.usdExchangeRate !== undefined && settings.usdExchangeRate !== null ? settings.usdExchangeRate : ''}
+                      onChange={(e) => {
+                        const val = e.target.value === '' ? undefined : Number(e.target.value)
+                        setSettings({ ...settings, usdExchangeRate: val })
+                      }}
+                      className="w-full px-3 py-1.5 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                    />
+                  </div>
+                  <div className="text-[11px] text-zinc-500 pb-1">
+                    {settings.usdExchangeRate && Number(settings.usdExchangeRate) > 0 ? (
+                      <span className="text-amber-700 font-medium">
+                        ✓ Таны тохируулсан {Number(settings.usdExchangeRate).toLocaleString()}₮ ханшийг ашиглана.
+                      </span>
+                    ) : (
+                      <span className="text-emerald-700 font-medium">
+                        ✓ Зах зээлийн шууд ханш ({Math.round(exchangeRate).toLocaleString()}₮) автоматаар ашиглагдаж байна.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Default WeTransfer link */}
               <div>
                 <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
@@ -2945,13 +3036,16 @@ export default function AdminPage() {
                     onClick={() => {
                       const isCurrentlyFree = editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
                       if (isCurrentlyFree) {
+                        const rate = exchangeRate > 0 ? exchangeRate : 3600
+                        const defMNT = 29900
+                        const defOrigMNT = editingProduct.originalPriceMNT || 89000
                         setEditingProduct({
                           ...editingProduct,
                           isFree: false,
-                          priceMNT: 29900,
-                          originalPriceMNT: editingProduct.originalPriceMNT || 89000,
-                          priceUSD: 9.99,
-                          originalPriceUSD: editingProduct.originalPriceUSD || 29.0,
+                          priceMNT: defMNT,
+                          originalPriceMNT: defOrigMNT,
+                          priceUSD: Number((defMNT / rate).toFixed(2)),
+                          originalPriceUSD: Number((defOrigMNT / rate).toFixed(2)),
                           badge: editingProduct.badge === 'ҮНЭГҮЙ' ? '' : editingProduct.badge,
                         })
                       } else {
@@ -3020,70 +3114,6 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                    Үнэ ₮ (MNT) {editingProduct.isFree || editingProduct.priceMNT === 0 ? '(Үнэгүй)' : '*'}
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editingProduct.priceMNT !== undefined && editingProduct.priceMNT !== null ? editingProduct.priceMNT : ''}
-                    onChange={(e) => {
-                      const val = Number(e.target.value)
-                      setEditingProduct({
-                        ...editingProduct,
-                        priceMNT: val,
-                        isFree: val === 0 && (editingProduct.priceUSD === 0 || !editingProduct.priceUSD),
-                      })
-                    }}
-                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Хуучин үнэ ₮</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={editingProduct.originalPriceMNT || ''}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, originalPriceMNT: Number(e.target.value) })}
-                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Үнэ $ (USD)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={editingProduct.priceUSD !== undefined && editingProduct.priceUSD !== null ? editingProduct.priceUSD : ''}
-                    onChange={(e) => {
-                      const val = Number(e.target.value)
-                      setEditingProduct({
-                        ...editingProduct,
-                        priceUSD: val,
-                        isFree: val === 0 && (editingProduct.priceMNT === 0 || !editingProduct.priceMNT),
-                      })
-                    }}
-                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-zinc-700 mb-1">Хуучин үнэ $</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min={0}
-                    value={editingProduct.originalPriceUSD || ''}
-                    onChange={(e) => setEditingProduct({ ...editingProduct, originalPriceUSD: Number(e.target.value) })}
-                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
-                  />
-                </div>
-
-                <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-[11px] font-semibold text-zinc-700">Файлын хэмжээ</label>
                     <span className="text-[9px] text-zinc-400">Сонголттой</span>
@@ -3116,6 +3146,168 @@ export default function AdminPage() {
                     <option value="anime">Anime (Хурд)</option>
                     <option value="riser">Riser (Өсөлт)</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Live USD Exchange Rate Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-amber-50/80 border border-amber-200/90 rounded-lg text-xs text-amber-950">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-semibold text-amber-950">
+                    Ханш: <strong className="font-mono text-zinc-900">1 USD = {Math.round(exchangeRate).toLocaleString()}₮</strong>
+                  </span>
+                  {rateSource === 'custom' ? (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 font-medium">
+                      Тохируулсан ханш
+                    </span>
+                  ) : (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 font-medium">
+                      Шууд зах зээлийн ханш
+                    </span>
+                  )}
+                  <span className="text-[11px] text-zinc-500 hidden sm:inline">
+                    (₮ үнэ бичих үед $ автоматаар тухайн ханшаар бодогдоно)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchExchangeRate}
+                  disabled={rateLoading}
+                  className="text-[11px] font-semibold text-amber-800 hover:text-amber-950 underline flex items-center gap-1 cursor-pointer transition-colors"
+                  title="Ханш шинэчлэх"
+                >
+                  <RefreshCw className={`w-3 h-3 ${rateLoading ? 'animate-spin' : ''}`} />
+                  <span>{rateLoading ? 'Шалгаж байна...' : 'Ханш шинэчлэх'}</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700">
+                      Үнэ ₮ (MNT) {editingProduct.isFree || editingProduct.priceMNT === 0 ? '(Үнэгүй)' : '*'}
+                    </label>
+                    {editingProduct.priceMNT && Number(editingProduct.priceMNT) > 0 ? (
+                      <span className="text-[10px] font-mono text-emerald-600 font-medium">
+                        ≈ ${((Number(editingProduct.priceMNT) || 0) / (exchangeRate || 3600)).toFixed(2)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editingProduct.priceMNT !== undefined && editingProduct.priceMNT !== null ? editingProduct.priceMNT : ''}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      const val = raw === '' ? 0 : Number(raw)
+                      const rate = exchangeRate > 0 ? exchangeRate : 3600
+                      const calcUSD = val > 0 ? Number((val / rate).toFixed(2)) : 0
+                      setEditingProduct({
+                        ...editingProduct,
+                        priceMNT: raw === '' ? ('' as any) : val,
+                        priceUSD: calcUSD,
+                        isFree: val === 0 && (calcUSD === 0),
+                      })
+                    }}
+                    placeholder="₮ үнэ бичихэд $ автоматаар бодогдоно"
+                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900 focus:border-[#0088CC] focus:ring-1 focus:ring-[#0088CC]/20"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700">Хуучин үнэ ₮</label>
+                    {editingProduct.originalPriceMNT && Number(editingProduct.originalPriceMNT) > 0 ? (
+                      <span className="text-[10px] font-mono text-zinc-400">
+                        ≈ ${((Number(editingProduct.originalPriceMNT) || 0) / (exchangeRate || 3600)).toFixed(2)}
+                      </span>
+                    ) : null}
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editingProduct.originalPriceMNT !== undefined && editingProduct.originalPriceMNT !== null ? editingProduct.originalPriceMNT : ''}
+                    onChange={(e) => {
+                      const raw = e.target.value
+                      const val = raw === '' ? 0 : Number(raw)
+                      const rate = exchangeRate > 0 ? exchangeRate : 3600
+                      const calcUSD = val > 0 ? Number((val / rate).toFixed(2)) : 0
+                      setEditingProduct({
+                        ...editingProduct,
+                        originalPriceMNT: raw === '' ? ('' as any) : val,
+                        originalPriceUSD: calcUSD > 0 ? calcUSD : (editingProduct.originalPriceUSD || 0),
+                      })
+                    }}
+                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700">Үнэ $ (USD)</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const mnt = Number(editingProduct.priceMNT) || 0
+                        const rate = exchangeRate > 0 ? exchangeRate : 3600
+                        const calcUSD = mnt > 0 ? Number((mnt / rate).toFixed(2)) : 0
+                        setEditingProduct({
+                          ...editingProduct,
+                          priceUSD: calcUSD,
+                          isFree: calcUSD === 0 && mnt === 0,
+                        })
+                      }}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                      title="₮ үнээс ам.долларын ханшаар дахин бодох"
+                    >
+                      ⚡ Ханшаар бодох
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={editingProduct.priceUSD !== undefined && editingProduct.priceUSD !== null ? editingProduct.priceUSD : ''}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      setEditingProduct({
+                        ...editingProduct,
+                        priceUSD: val,
+                        isFree: val === 0 && (editingProduct.priceMNT === 0 || !editingProduct.priceMNT),
+                      })
+                    }}
+                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-zinc-700">Хуучин үнэ $</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const origMNT = Number(editingProduct.originalPriceMNT) || 0
+                        const rate = exchangeRate > 0 ? exchangeRate : 3600
+                        const calcUSD = origMNT > 0 ? Number((origMNT / rate).toFixed(2)) : 0
+                        setEditingProduct({
+                          ...editingProduct,
+                          originalPriceUSD: calcUSD,
+                        })
+                      }}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline cursor-pointer font-medium"
+                      title="Хуучин ₮ үнээс ам.долларын ханшаар дахин бодох"
+                    >
+                      ⚡ Ханшаар бодох
+                    </button>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    value={editingProduct.originalPriceUSD !== undefined && editingProduct.originalPriceUSD !== null ? editingProduct.originalPriceUSD : ''}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, originalPriceUSD: Number(e.target.value) })}
+                    className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+                  />
                 </div>
               </div>
 

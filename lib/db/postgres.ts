@@ -513,6 +513,7 @@ export const postgresDB = {
         telegramChatId: bankInfo.telegramChatId || '',
         resendApiKey: bankInfo.resendApiKey || '',
         emailFrom: bankInfo.emailFrom || '',
+        usdExchangeRate: Number(data.usd_exchange_rate) || Number(bankInfo.usdExchangeRate) || undefined,
       }
     } catch (err) {
         console.error('PostgreSQL getSettings error:', err)
@@ -532,6 +533,7 @@ export const postgresDB = {
           ...(settings.resendApiKey !== undefined ? { resendApiKey: settings.resendApiKey } : {}),
           ...(settings.emailFrom !== undefined ? { emailFrom: settings.emailFrom } : {}),
           ...(settings.r2Config !== undefined ? { r2Config: settings.r2Config } : {}),
+          ...(settings.usdExchangeRate !== undefined ? { usdExchangeRate: settings.usdExchangeRate } : {}),
         }
 
       const query = `
