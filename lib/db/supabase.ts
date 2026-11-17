@@ -46,7 +46,7 @@ function mapProductRow(row: any): StoreProduct {
     try {
       const parsed = JSON.parse(row.image)
       if (Array.isArray(parsed)) images = parsed.filter(Boolean).map(resolveProductImageUrl)
-    } catch {}
+    } catch { }
   } else if (row.image) {
     images = [resolveProductImageUrl(row.image)]
   }
@@ -73,7 +73,7 @@ function mapProductRow(row: any): StoreProduct {
     title: row.title,
     subtitle: row.subtitle || '',
     category: row.category || 'sfx',
-    badge: row.badge || '',
+    badge: (row.badge || '').replace('85%', '40%'),
     rating: Number(row.rating) || 5.0,
     reviewCount: Number(row.review_count) || 1,
     priceMNT: Number(row.price_mnt) || 0,
@@ -175,7 +175,7 @@ function extractBonumMetadata(row: any) {
         if (!bonumQrCode && meta.qrCode) bonumQrCode = meta.qrCode
         if (!bonumQrImage && meta.qrImage) bonumQrImage = meta.qrImage
         if (!bonumQrLinks && meta.qrLinks) bonumQrLinks = meta.qrLinks
-      } catch {}
+      } catch { }
       cleanAdminNotes = cleanAdminNotes.replace(/<!--BONUM_META:(.*?)-->/g, '').trim()
     }
   }
@@ -598,7 +598,7 @@ export const supabaseDB = {
           updates.transferReference = updates.bonumInvoiceId
         }
       }
-    } catch {}
+    } catch { }
 
     const row = mapOrderUpdatesToRow(updates, existingNotes)
     const data = await executeSupabaseWithSelfHealing(
@@ -632,7 +632,7 @@ export const supabaseDB = {
       subdomain: data.subdomain,
       currencyDefault: data.currency_default || 'MNT',
       adminPasscode: data.admin_passcode,
-      announcementText: data.announcement_text,
+      announcementText: (data.announcement_text || '').replace('85%', '40%') || 'Бүх багц 40% хямдралтай · WeTransfer шууд таталт',
       categories,
       bankInfo,
       defaultBundleWeTransfer: data.default_bundle_wetransfer || '',

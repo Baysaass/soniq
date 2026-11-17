@@ -31,7 +31,7 @@ export function StoreStickyBar() {
       <div className="bg-white/95 border border-[#E6E6E3] rounded-full p-2.5 sm:px-5 shadow-lg backdrop-blur-md flex items-center justify-between gap-3 font-sans">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E5F6FF] text-[#0088CC] shrink-0">
-            {bundle.badge || '85% OFF'}
+            {bundle.badge || '40% OFF'}
           </span>
           <span className="font-bold text-xs text-[#141414] truncate">
             {bundle.title}

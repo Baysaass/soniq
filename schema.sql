@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS store_settings (
   subdomain VARCHAR(255) DEFAULT 'shop.soniq.click',
   currency_default VARCHAR(10) DEFAULT 'MNT',
   admin_passcode TEXT NOT NULL DEFAULT 'Amirda700+',
-  announcement_text TEXT DEFAULT 'Бүх багц 85% хямдралтай · WeTransfer болон R2 шууд таталт',
+  announcement_text TEXT DEFAULT 'Бүх багц 40% хямдралтай · WeTransfer болон R2 шууд таталт',
   bank_info JSONB DEFAULT '{
     "bankName": "Хаан Банк (Khan Bank)",
     "accountNumber": "5608120471",

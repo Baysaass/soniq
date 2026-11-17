@@ -164,7 +164,7 @@ export default function AdminPage() {
   const [settings, setSettings] = useState<StoreSettingsState>({
     ...STORE_SETTINGS,
     categories: DEFAULT_STORE_CATEGORIES,
-    announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
+    announcementText: 'Бүх багц 40% хямдралтай · WeTransfer шууд таталт',
     usdExchangeRate: undefined,
     r2Config: {
       accountId: '',
@@ -2203,7 +2203,7 @@ export default function AdminPage() {
                   type="text"
                   value={settings.announcementText || ''}
                   onChange={(e) => setSettings({ ...settings, announcementText: e.target.value })}
-                  placeholder="Бүх багц 85% хямдралтай · WeTransfer шууд таталт"
+                  placeholder="Бүх багц 40% хямдралтай · WeTransfer шууд таталт"
                   className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                 />
               </div>
@@ -3239,7 +3239,7 @@ export default function AdminPage() {
                     type="text"
                     value={editingProduct.badge || ''}
                     onChange={(e) => setEditingProduct({ ...editingProduct, badge: e.target.value })}
-                    placeholder="HOT / 85% OFF / ҮНЭГҮЙ"
+                    placeholder="HOT / 40% OFF / ҮНЭГҮЙ"
                     className="w-full px-2.5 py-1.8 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
                   />
                 </div>
@@ -4178,7 +4178,7 @@ export default function AdminPage() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {[50, 60, 70, 75, 80, 85, 90].map((pct) => (
+                          {[40, 50, 60, 70, 75, 80, 85, 90].map((pct) => (
                             <button
                               key={pct}
                               type="button"
@@ -4201,7 +4201,7 @@ export default function AdminPage() {
                               max={99}
                               value={editingProduct.discountPercent || ''}
                               onChange={(e) => applyBundleDiscountPercent(Number(e.target.value))}
-                              placeholder="Жишээ: 85"
+                              placeholder="Жишээ: 40"
                               className="w-16 px-2 py-1 bg-white border border-zinc-300 rounded text-xs font-mono font-bold text-center"
                             />
                             <span className="text-xs font-bold text-zinc-700">%</span>

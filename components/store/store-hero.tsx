@@ -145,7 +145,7 @@ export function StoreHero() {
                       </div>
                     ) : (
                       <div className="bg-[#141414] text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-xs">
-                        {currentBundle.badge || '85% ХЭМНЭЛТ'}
+                        {currentBundle.badge || '40% ХЭМНЭЛТ'}
                       </div>
                     )}
                     {currentBundle.sampleVideoUrl && (

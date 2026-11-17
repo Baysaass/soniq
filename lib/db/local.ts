@@ -285,7 +285,7 @@ export const localDB = {
           if (parsed && typeof parsed === 'object') {
             const loaded: StoreSettingsType = {
               ...STORE_SETTINGS,
-              announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
+              announcementText: 'Бүх багц 40% хямдралтай · WeTransfer шууд таталт',
               ...parsed,
               categories: (Array.isArray(parsed.categories) && parsed.categories.length > 0)
                 ? parsed.categories
@@ -315,7 +315,7 @@ export const localDB = {
 
     const defaultSettings: StoreSettingsType = {
       ...STORE_SETTINGS,
-      announcementText: 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт',
+      announcementText: 'Бүх багц 40% хямдралтай · WeTransfer шууд таталт',
       r2Config: {
         accountId: process.env.R2_ACCOUNT_ID || '',
         accessKeyId: process.env.R2_ACCESS_KEY_ID || '',

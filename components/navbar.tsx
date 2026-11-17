@@ -40,7 +40,7 @@ export function Navbar({
           >
             <span>Дэлгүүр (Store)</span>
             <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-gradient-to-r from-red-600 to-amber-600 text-white">
-              85% OFF
+              40% OFF
             </span>
           </Link>
         </nav>
@@ -87,7 +87,7 @@ export function Navbar({
             >
               <span>Дэлгүүр (Store)</span>
               <span className="px-1.5 py-0.5 rounded text-[10px] font-black uppercase bg-gradient-to-r from-red-600 to-amber-600 text-white">
-                85% OFF
+                40% OFF
               </span>
             </Link>
           </nav>

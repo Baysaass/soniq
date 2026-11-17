@@ -50,7 +50,7 @@ ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS r2_config JSONB DEFAULT '{
   "publicDomain": ""
 }'::jsonb;
 
-ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS announcement_text TEXT DEFAULT 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт';
+ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS announcement_text TEXT DEFAULT 'Бүх багц 40% хямдралтай · WeTransfer шууд таталт';
 ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS default_bundle_wetransfer TEXT DEFAULT '';
 
 -- Анхдагч тохиргооны мөр байхгүй бол нэмэх

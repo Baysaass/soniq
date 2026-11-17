@@ -23,7 +23,7 @@ export interface StoreProduct {
   fileFormats?: string[]
   isBundle?: boolean
   bundleProductIds?: string[] // IDs of included products in this bundle
-  discountPercent?: number // Discount percentage, e.g. 85 for 85%
+  discountPercent?: number // Discount percentage, e.g. 40 for 40%
   isFree?: boolean
   description: string
   sampleVideoUrl?: string

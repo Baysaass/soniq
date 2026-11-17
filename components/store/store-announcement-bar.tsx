@@ -32,7 +32,7 @@ export function StoreAnnouncementBar() {
 
   const formatDigits = (n: number) => n.toString().padStart(2, '0')
 
-  const announcementText = settings?.announcementText || 'Бүх багц 85% хямдралтай · WeTransfer шууд таталт'
+  const announcementText = settings?.announcementText || 'Бүх багц 40% хямдралтай · WeTransfer шууд таталт'
 
   return (
     <div className="bg-[#141414] text-white text-[11px] py-1.5 px-3 border-b border-black/10 select-none">
