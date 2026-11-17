@@ -48,6 +48,23 @@ function mapProductRow(row: any): StoreProduct {
 
   const primaryImage = images[0] || resolveProductImageUrl(row.image) || '/images/product-morph-3d.png'
 
+  const rawCompat = Array.isArray(row.compatibility)
+    ? row.compatibility
+    : (typeof row.compatibility === 'string' ? (() => { try { return JSON.parse(row.compatibility) } catch { return [] } })() : [])
+  const compatList: string[] = Array.isArray(rawCompat) ? rawCompat : []
+  const bundleItemsTag = compatList.find((c: string) => typeof c === 'string' && c.startsWith('bundle_items:'))
+  const bundleProductIds: string[] = Array.isArray(row.bundle_product_ids)
+    ? row.bundle_product_ids
+    : (bundleItemsTag ? bundleItemsTag.replace('bundle_items:', '').split(',').filter(Boolean) : (row.bundleProductIds || []))
+  const cleanCompatibility = compatList.filter((c: string) => typeof c === 'string' && !c.startsWith('bundle_items:'))
+
+  const priceMNT = Number(row.price_mnt) || 0
+  const originalPriceMNT = Number(row.original_price_mnt) || 0
+  let discountPercent = Number(row.discount_percent) || Number(row.discountPercent) || 0
+  if (!discountPercent && originalPriceMNT > priceMNT && originalPriceMNT > 0) {
+    discountPercent = Math.round(((originalPriceMNT - priceMNT) / originalPriceMNT) * 100)
+  }
+
   return {
     id: row.id,
     slug: row.slug,
@@ -57,14 +74,14 @@ function mapProductRow(row: any): StoreProduct {
     badge: row.badge || '',
     rating: Number(row.rating) || 5.0,
     reviewCount: Number(row.review_count) || 1,
-    priceMNT: Number(row.price_mnt) || 0,
-    originalPriceMNT: Number(row.original_price_mnt) || 0,
+    priceMNT,
+    originalPriceMNT,
     priceUSD: Number(row.price_usd) || 0,
     originalPriceUSD: Number(row.original_price_usd) || 0,
     image: primaryImage,
     images: images.length > 0 ? images.slice(0, 6) : [primaryImage],
-    features: Array.isArray(row.features) ? row.features : [],
-    compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
+    features: Array.isArray(row.features) ? row.features : (typeof row.features === 'string' ? (() => { try { return JSON.parse(row.features) } catch { return [] } })() : []),
+    compatibility: cleanCompatibility,
     format: row.format || '',
     fileFormats: row.format
       ? row.format.split(',').map((s: string) => s.trim()).filter(Boolean)
@@ -76,6 +93,8 @@ function mapProductRow(row: any): StoreProduct {
     r2Key: row.r2_key || '',
     previewSoundType: row.preview_sound_type || 'none',
     isBundle: Boolean(row.is_bundle),
+    bundleProductIds,
+    discountPercent: discountPercent > 0 ? discountPercent : undefined,
     description: row.description || '',
     notice: row.notice || '',
   }
@@ -232,6 +251,13 @@ export const postgresDB = {
         : (product.image ? [product.image] : [])
       const createSerializedImage = createImgs.length > 1 ? createImgs.join('|||') : (createImgs[0] || product.image || '/images/product-morph-3d.png')
 
+      let createCompat = Array.isArray(product.compatibility)
+        ? product.compatibility.filter((c: string) => typeof c === 'string' && !c.startsWith('bundle_items:'))
+        : []
+      if (product.bundleProductIds && product.bundleProductIds.length > 0) {
+        createCompat.push(`bundle_items:${product.bundleProductIds.join(',')}`)
+      }
+
       const values = [
         product.id || `prod_${Date.now()}`,
         product.slug || `pack-${Date.now()}`,
@@ -247,7 +273,7 @@ export const postgresDB = {
         product.originalPriceUSD || 29.0,
         createSerializedImage,
         JSON.stringify(product.features || []),
-        JSON.stringify(product.compatibility || []),
+        JSON.stringify(createCompat),
         product.format || (Array.isArray(product.fileFormats) ? product.fileFormats.join(', ') : ''),
         product.fileSize || '',
         product.downloadCount || '0+ таталт',
@@ -304,6 +330,13 @@ export const postgresDB = {
         WHERE id = $1
         RETURNING *
       `
+      let updateCompat = Array.isArray(merged.compatibility)
+        ? merged.compatibility.filter((c: string) => typeof c === 'string' && !c.startsWith('bundle_items:'))
+        : []
+      if (merged.bundleProductIds && merged.bundleProductIds.length > 0) {
+        updateCompat.push(`bundle_items:${merged.bundleProductIds.join(',')}`)
+      }
+
       const values = [
         id,
         merged.slug,
@@ -317,7 +350,7 @@ export const postgresDB = {
         merged.originalPriceUSD,
         updateSerializedImage,
         JSON.stringify(merged.features || []),
-        JSON.stringify(merged.compatibility || []),
+        JSON.stringify(updateCompat),
         merged.format,
         merged.fileSize,
         merged.defaultWeTransferLink,

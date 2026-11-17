@@ -14,6 +14,7 @@ import {
   Gift,
   Download,
   Sparkles,
+  Package,
 } from 'lucide-react'
 import { STORE_PRODUCTS, DEFAULT_STORE_CATEGORIES, StoreCategory } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
@@ -246,7 +247,12 @@ export function StoreProductGrid() {
                     </Link>
 
                     <div className="absolute top-2 left-2 flex items-center gap-1 flex-wrap">
-                      {(product.isFree || (product.priceMNT === 0 && product.priceUSD === 0)) ? (
+                      {product.isBundle ? (
+                        <div className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1">
+                          <Package className="w-2.5 h-2.5" />
+                          <span>{product.badge || 'BUNDLE'}</span>
+                        </div>
+                      ) : (product.isFree || (product.priceMNT === 0 && product.priceUSD === 0)) ? (
                         <div className="bg-emerald-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full shadow-xs flex items-center gap-1 animate-pulse">
                           <Gift className="w-2.5 h-2.5" />
                           <span>ҮНЭГҮЙ</span>
@@ -315,13 +321,20 @@ export function StoreProductGrid() {
                       </span>
                     </div>
                   ) : (
-                    <div className="flex items-baseline justify-between mb-2">
-                      <span className="font-extrabold text-[13px] text-[#141414]">
-                        {formatPrice(product.priceMNT, product.priceUSD)}
-                      </span>
-                      <span className="text-[10px] text-zinc-400 line-through font-mono">
-                        {formatPrice(product.originalPriceMNT, product.originalPriceUSD)}
-                      </span>
+                    <div className="flex items-baseline justify-between mb-2 gap-1.5 flex-wrap">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="font-extrabold text-[13px] text-[#141414]">
+                          {formatPrice(product.priceMNT, product.priceUSD)}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 line-through font-mono">
+                          {formatPrice(product.originalPriceMNT, product.originalPriceUSD)}
+                        </span>
+                      </div>
+                      {(product.discountPercent || (product.originalPriceMNT > product.priceMNT && product.originalPriceMNT > 0)) && (
+                        <span className="text-[9px] font-black text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200">
+                          {product.discountPercent || Math.round(((product.originalPriceMNT - product.priceMNT) / product.originalPriceMNT) * 100)}% ХЯМДРАЛ
+                        </span>
+                      )}
                     </div>
                   )}
 

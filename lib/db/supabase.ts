@@ -53,6 +53,20 @@ function mapProductRow(row: any): StoreProduct {
 
   const primaryImage = images[0] || resolveProductImageUrl(row.image) || '/images/product-morph-3d.png'
 
+  const compatList: string[] = Array.isArray(row.compatibility) ? row.compatibility : []
+  const bundleItemsTag = compatList.find((c: string) => typeof c === 'string' && c.startsWith('bundle_items:'))
+  const bundleProductIds: string[] = Array.isArray(row.bundle_product_ids)
+    ? row.bundle_product_ids
+    : (bundleItemsTag ? bundleItemsTag.replace('bundle_items:', '').split(',').filter(Boolean) : (row.bundleProductIds || []))
+  const cleanCompatibility = compatList.filter((c: string) => typeof c === 'string' && !c.startsWith('bundle_items:'))
+
+  const priceMNT = Number(row.price_mnt) || 0
+  const originalPriceMNT = Number(row.original_price_mnt) || 0
+  let discountPercent = Number(row.discount_percent) || Number(row.discountPercent) || 0
+  if (!discountPercent && originalPriceMNT > priceMNT && originalPriceMNT > 0) {
+    discountPercent = Math.round(((originalPriceMNT - priceMNT) / originalPriceMNT) * 100)
+  }
+
   return {
     id: row.id,
     slug: row.slug,
@@ -69,7 +83,7 @@ function mapProductRow(row: any): StoreProduct {
     image: primaryImage,
     images: images.length > 0 ? images.slice(0, 6) : [primaryImage],
     features: Array.isArray(row.features) ? row.features : [],
-    compatibility: Array.isArray(row.compatibility) ? row.compatibility : [],
+    compatibility: cleanCompatibility,
     format: row.format || '',
     fileFormats: row.format
       ? row.format.split(',').map((s: string) => s.trim()).filter(Boolean)
@@ -81,6 +95,8 @@ function mapProductRow(row: any): StoreProduct {
     r2Key: row.r2_key || '',
     previewSoundType: row.preview_sound_type || 'none',
     isBundle: Boolean(row.is_bundle),
+    bundleProductIds,
+    discountPercent: discountPercent > 0 ? discountPercent : undefined,
     description: row.description || '',
     notice: row.notice || '',
   }
@@ -110,8 +126,14 @@ function mapProductToRow(prod: Partial<StoreProduct>): Record<string, any> {
   if (prod.features !== undefined) {
     row.features = Array.isArray(prod.features) ? prod.features : []
   }
-  if (prod.compatibility !== undefined) {
-    row.compatibility = Array.isArray(prod.compatibility) ? prod.compatibility : []
+  if (prod.compatibility !== undefined || prod.bundleProductIds !== undefined) {
+    let cleanCompat = Array.isArray(prod.compatibility)
+      ? prod.compatibility.filter((c: string) => typeof c === 'string' && !c.startsWith('bundle_items:'))
+      : []
+    if (prod.bundleProductIds && prod.bundleProductIds.length > 0) {
+      cleanCompat.push(`bundle_items:${prod.bundleProductIds.join(',')}`)
+    }
+    row.compatibility = cleanCompat
   }
   if (prod.fileFormats !== undefined && Array.isArray(prod.fileFormats)) {
     row.format = prod.fileFormats.join(', ')

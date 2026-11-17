@@ -22,6 +22,8 @@ export interface StoreProduct {
   previewSoundType?: 'whoosh' | 'impact' | 'braam' | 'ui' | 'glitch' | 'anime' | 'riser' | 'none' | ''
   fileFormats?: string[]
   isBundle?: boolean
+  bundleProductIds?: string[] // IDs of included products in this bundle
+  discountPercent?: number // Discount percentage, e.g. 85 for 85%
   isFree?: boolean
   description: string
   sampleVideoUrl?: string

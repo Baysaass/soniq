@@ -121,6 +121,8 @@ export const localDB = {
       r2Key: data.r2Key || '',
       previewSoundType: data.previewSoundType || 'none',
       isBundle: Boolean(data.isBundle),
+      bundleProductIds: Array.isArray(data.bundleProductIds) ? data.bundleProductIds : [],
+      discountPercent: data.discountPercent !== undefined ? Number(data.discountPercent) : undefined,
       description: data.description || '',
     }
 

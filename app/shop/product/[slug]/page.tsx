@@ -17,6 +17,7 @@ import {
   Palette,
   AlertTriangle,
   Gift,
+  Package,
 } from 'lucide-react'
 import { STORE_PRODUCTS, ULTIMATE_BUNDLE, StoreProduct } from '@/lib/store-data'
 import { StoreProvider, useStore } from '@/lib/store-context'
@@ -28,6 +29,7 @@ import { StoreCheckoutModal } from '@/components/store/store-checkout-modal'
 import { StoreSampleVideo } from '@/components/store/store-sample-video'
 import { StoreProductCollage } from '@/components/store/store-product-collage'
 import { FileFormatBadgeList } from '@/components/store/file-format-badge'
+import { SafeProductImage } from '@/components/store/safe-image'
 
 function ProductDetailContent({ slug }: { slug: string }) {
   const {
@@ -41,6 +43,10 @@ function ProductDetailContent({ slug }: { slug: string }) {
 
   const product = (products || []).find((p) => p.slug === slug)
   const bundle = ultimateBundle || ULTIMATE_BUNDLE
+
+  const bundledProducts = (product?.bundleProductIds && product.bundleProductIds.length > 0)
+    ? (products || []).filter((p) => product.bundleProductIds?.includes(p.id) || product.bundleProductIds?.includes(p.slug))
+    : []
 
   // If products are still loading and not yet in cache, show skeleton
   if (!product && !productsLoaded) {
@@ -265,16 +271,22 @@ function ProductDetailContent({ slug }: { slug: string }) {
                     </span>
                   </div>
                 ) : (
-                  <div className="flex items-baseline gap-2 mb-3">
+                  <div className="flex items-baseline gap-2 mb-3 flex-wrap">
                     <span className="text-2xl sm:text-3xl font-black text-[#141414] tracking-tight">
                       {formatPrice(product.priceMNT, product.priceUSD)}
                     </span>
                     <span className="text-xs text-zinc-400 line-through font-mono">
                       {formatPrice(product.originalPriceMNT, product.originalPriceUSD)}
                     </span>
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                      Нэг удаа төлнө · Насан туршийн эрх
-                    </span>
+                    {product.discountPercent || (product.originalPriceMNT > product.priceMNT && product.originalPriceMNT > 0) ? (
+                      <span className="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        {product.discountPercent || Math.round(((product.originalPriceMNT - product.priceMNT) / product.originalPriceMNT) * 100)}% ХЯМДРАЛ
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                        Нэг удаа төлнө · Насан туршийн эрх
+                      </span>
+                    )}
                   </div>
                 )}
 
@@ -336,6 +348,66 @@ function ProductDetailContent({ slug }: { slug: string }) {
             </div>
           </div>
         </div>
+
+        {/* Bundled Products Showcase for Bundles */}
+        {bundledProducts.length > 0 && (
+          <div className="mb-8 p-5 bg-gradient-to-br from-amber-50/60 via-orange-50/20 to-white rounded-2xl border border-amber-200/90 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-3 border-b border-amber-200/80">
+              <div>
+                <div className="flex items-center gap-1.5 text-xs font-black text-amber-800 uppercase tracking-wider">
+                  <Package className="w-4 h-4 text-amber-600" />
+                  <span>Багцад багтсан бүтээгдэхүүнүүд ({bundledProducts.length})</span>
+                </div>
+                <p className="text-xs text-zinc-600 mt-0.5">
+                  Энэхүү Bundle-ийг худалдан авснаар дараах бүх бүтээгдэхүүнийг нэгэн зэрэг бүрэн эрхтэйгээр татан авах боломжтой:
+                </p>
+              </div>
+
+              <div className="text-left sm:text-right shrink-0">
+                <span className="text-[10px] text-zinc-500 block">Тусад нь авбал нийт үнэ:</span>
+                <span className="text-xs font-mono font-bold text-zinc-500 line-through">
+                  {formatPrice(
+                    bundledProducts.reduce((acc, p) => acc + (p.priceMNT || 0), 0),
+                    bundledProducts.reduce((acc, p) => acc + (p.priceUSD || 0), 0)
+                  )}
+                </span>{' '}
+                <span className="text-xs font-mono font-black text-emerald-600">
+                  → Багцын үнэ: {formatPrice(product.priceMNT, product.priceUSD)}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {bundledProducts.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/shop/product/${item.slug}`}
+                  className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-amber-200/70 hover:border-amber-400 hover:shadow-xs transition-all group"
+                >
+                  <div className="w-12 h-12 rounded-lg bg-zinc-100 overflow-hidden relative shrink-0">
+                    <SafeProductImage
+                      src={item.image || (item.images && item.images[0]) || '/images/product-morph-3d.png'}
+                      alt={item.title}
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold text-zinc-900 group-hover:text-[#0088CC] transition-colors truncate">
+                      {item.title}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 flex items-center justify-between mt-0.5 font-mono">
+                      <span>{item.category}</span>
+                      <span className="font-semibold text-zinc-700">
+                        {formatPrice(item.priceMNT, item.priceUSD)}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Sample Video Showcase if available */}
         {product.sampleVideoUrl && (

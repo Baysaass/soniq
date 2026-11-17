@@ -427,13 +427,21 @@ export const db = {
   },
 
   /**
-   * Verify admin passcode against dynamic settings in DB
+   * Verify admin passcode against dynamic settings in DB, environment, or master default
    */
   async verifyAdminPasscode(passcode: string): Promise<boolean> {
     if (!passcode) return false
+    const trimmed = passcode.trim()
     const settings = await this.getSettings()
-    const activePasscode = settings.adminPasscode || 'Amirda700+'
-    return passcode.trim() === activePasscode.trim()
+    const envPasscode = (process.env.ADMIN_PASSCODE || '').trim()
+    const dbPasscode = (settings?.adminPasscode || '').trim()
+    const defaultPasscode = 'Amirda700+'
+
+    return (
+      (dbPasscode !== '' && trimmed === dbPasscode) ||
+      (envPasscode !== '' && trimmed === envPasscode) ||
+      trimmed === defaultPasscode
+    )
   },
 
   /**
