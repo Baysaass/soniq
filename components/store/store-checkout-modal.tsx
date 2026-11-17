@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   X,
@@ -62,6 +62,13 @@ export function StoreCheckoutModal() {
   const [generatingR2, setGeneratingR2] = useState(false)
   const [r2DownloadUrl, setR2DownloadUrl] = useState<string | null>(null)
   const [r2Error, setR2Error] = useState<string | null>(null)
+
+  // Pre-warm Bonum token & connection in background as soon as checkout opens
+  useEffect(() => {
+    if (isCheckoutOpen && paymentMethodChoice === 'bonum') {
+      fetch('/api/bonum/checkout').catch(() => {})
+    }
+  }, [isCheckoutOpen, paymentMethodChoice])
 
   if (!isCheckoutOpen) return null
 

@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import os from 'os'
 import crypto from 'crypto'
 import {
   BonumGatewayClient,
@@ -16,8 +17,16 @@ import type {
 import type { Order } from './orders-db'
 import { getStoreSettings } from './settings-db'
 
-const DATA_DIR = path.join(process.cwd(), 'data')
-const TOKENS_CACHE_FILE = path.join(DATA_DIR, '.bonum-tokens.json')
+// On Vercel / serverless, process.cwd() is read-only (/var/task), while os.tmpdir() (/tmp) is writable!
+function getTokensCacheFile(): string {
+  try {
+    const tmp = os.tmpdir()
+    if (tmp && fs.existsSync(tmp)) {
+      return path.join(tmp, '.bonum-tokens.json')
+    }
+  } catch {}
+  return path.join(process.cwd(), 'data', '.bonum-tokens.json')
+}
 
 export interface BonumTokenData {
   accessToken: string
@@ -26,39 +35,46 @@ export interface BonumTokenData {
   refreshExpiresAt: number
 }
 
-// In-memory token holder
-let inMemoryToken: BonumTokenData | null = null
+// Global in-memory token and client holders across serverless warm invocations
+const globalForBonum = globalThis as unknown as {
+  bonumClient?: BonumGatewayClient
+  bonumPspClient?: BonumClient
+  bonumTokens?: BonumTokenData
+}
 
 function loadTokenCache(): BonumTokenData | null {
-  if (inMemoryToken && inMemoryToken.expiresAt > Date.now()) {
-    return inMemoryToken
+  if (globalForBonum.bonumTokens && globalForBonum.bonumTokens.expiresAt > Date.now()) {
+    return globalForBonum.bonumTokens
   }
+  const cacheFile = getTokensCacheFile()
   try {
-    if (fs.existsSync(TOKENS_CACHE_FILE)) {
-      const content = fs.readFileSync(TOKENS_CACHE_FILE, 'utf-8').trim()
+    if (fs.existsSync(cacheFile)) {
+      const content = fs.readFileSync(cacheFile, 'utf-8').trim()
       if (content) {
         const parsed: BonumTokenData = JSON.parse(content)
         if (parsed.accessToken && parsed.expiresAt > Date.now()) {
-          inMemoryToken = parsed
+          globalForBonum.bonumTokens = parsed
           return parsed
         }
       }
     }
   } catch (err) {
-    console.warn('[Bonum] Failed to read token cache:', err)
+    // Non-fatal cache read error
   }
   return null
 }
 
 function saveTokenCache(data: BonumTokenData) {
-  inMemoryToken = data
+  globalForBonum.bonumTokens = data
   try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true })
+    const cacheFile = getTokensCacheFile()
+    const dir = path.dirname(cacheFile)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
     }
-    fs.writeFileSync(TOKENS_CACHE_FILE, JSON.stringify(data, null, 2), 'utf-8')
+    fs.writeFileSync(cacheFile, JSON.stringify(data, null, 2), 'utf-8')
   } catch (err) {
-    console.warn('[Bonum] Failed to write token cache:', err)
+    // Non-fatal cache write error
   }
 }
 
@@ -105,16 +121,14 @@ export function getBonumCredentials() {
   }
 }
 
-let clientInstance: BonumGatewayClient | null = null
-
 /**
  * Get or initialize the singleton BonumGatewayClient with token persistence
  */
 export function getBonumGatewayClient(): BonumGatewayClient {
   const creds = getBonumCredentials()
 
-  if (!clientInstance) {
-    clientInstance = new BonumGatewayClient({
+  if (!globalForBonum.bonumClient) {
+    const client = new BonumGatewayClient({
       baseUrl: creds.baseUrl,
       appSecret: creds.appSecret,
       terminalId: creds.terminalId,
@@ -125,15 +139,15 @@ export function getBonumGatewayClient(): BonumGatewayClient {
     // Hydrate existing cached token
     const cached = loadTokenCache()
     if (cached) {
-      ;(clientInstance as any).accessToken = cached.accessToken
-      ;(clientInstance as any).refreshToken = cached.refreshToken
-      ;(clientInstance as any).tokenExpiresAt = cached.expiresAt
-      ;(clientInstance as any).refreshExpiresAt = cached.refreshExpiresAt
+      ;(client as any).accessToken = cached.accessToken
+      ;(client as any).refreshToken = cached.refreshToken
+      ;(client as any).tokenExpiresAt = cached.expiresAt
+      ;(client as any).refreshExpiresAt = cached.refreshExpiresAt
     }
 
     // Intercept setTokens to automatically persist tokens
-    const originalSetTokens = (clientInstance as any).setTokens.bind(clientInstance)
-    ;(clientInstance as any).setTokens = (data: any) => {
+    const originalSetTokens = (client as any).setTokens.bind(client)
+    ;(client as any).setTokens = (data: any) => {
       originalSetTokens(data)
       const now = Date.now()
       const expiresAt = now + (data.expiresIn || 1800) * 1000 - 60000
@@ -145,25 +159,25 @@ export function getBonumGatewayClient(): BonumGatewayClient {
         refreshExpiresAt,
       })
     }
+
+    globalForBonum.bonumClient = client
   }
 
-  return clientInstance
+  return globalForBonum.bonumClient
 }
-
-let pspClientInstance: BonumClient | null = null
 
 /**
  * Get PSP client for Apple Pay / Google Pay operations
  */
 export function getBonumPspClient(): BonumClient {
   const creds = getBonumCredentials()
-  if (!pspClientInstance) {
-    pspClientInstance = new BonumClient({
+  if (!globalForBonum.bonumPspClient) {
+    globalForBonum.bonumPspClient = new BonumClient({
       endpoint: creds.endpoint,
       merchantKey: creds.appSecret,
     })
   }
-  return pspClientInstance
+  return globalForBonum.bonumPspClient
 }
 
 /**
