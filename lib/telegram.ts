@@ -163,6 +163,8 @@ export function formatOrderNotificationText(order: Order, siteUrl: string = 'htt
     (Number(order.totalAmountMNT || 0) === 0 && Number(order.totalAmountUSD || 0) === 0) ||
     order.paymentMethod === 'FREE_DOWNLOAD'
 
+  const isBonum = order.paymentMethod === 'BONUM'
+
   const itemsText = (order.items || [])
     .map((item) => `  • <b>${escapeHtml(item.title)}</b> (${isFree ? 'ҮНЭГҮЙ' : item.price ? Number(item.price).toLocaleString() + '₮' : ''})`)
     .join('\n')
@@ -170,8 +172,8 @@ export function formatOrderNotificationText(order: Order, siteUrl: string = 'htt
   const totalFormatted = isFree
     ? '🎁 ҮНЭГҮЙ (0₮)'
     : order.currency === 'USD'
-    ? `$${(order.totalAmountUSD || 0).toFixed(2)}`
-    : `${(order.totalAmountMNT || 0).toLocaleString()}₮`
+      ? `$${(order.totalAmountUSD || 0).toFixed(2)}`
+      : `${(order.totalAmountMNT || 0).toLocaleString()}₮`
 
   const dateStr = new Date(order.createdAt || Date.now()).toLocaleString('mn-MN', {
     timeZone: 'Asia/Ulaanbaatar',
@@ -196,7 +198,8 @@ ${itemsText || '  • Үнэгүй багц'}
 👉 Доорх товчоор захиалгын хуудсыг харна уу:`
   }
 
-  return `🔔 <b>ШИНЭ ЗАХИАЛГА ИРЛЭЭ!</b>
+  if (isBonum) {
+    return `⚡ <b>ШИНЭ ЗАХИАЛГА (BONUM АВТОМАТ ТӨЛБӨР)</b>
 ━━━━━━━━━━━━━━━━━━━━
 📦 <b>Захиалга:</b> <code>${escapeHtml(order.id)}</code>
 📅 <b>Огноо:</b> ${escapeHtml(dateStr)}
@@ -205,13 +208,31 @@ ${itemsText || '  • Үнэгүй багц'}
 📞 <b>Утас:</b> <code>${escapeHtml(order.customerPhone || 'Утасгүй')}</code>
 📧 <b>Gmail (Drive):</b> <code>${escapeHtml(order.customerEmail)}</code>
 
-💰 <b>Төлсөн дүн:</b> <b>${totalFormatted}</b>
-💳 <b>Төлбөр:</b> ${escapeHtml(order.paymentMethod || 'Хаан Банк')}
-${order.receiptNote ? `📝 <b>Гүйлгээний утга:</b> <code>${escapeHtml(order.receiptNote)}</code>\n` : ''}
+💰 <b>Төлбөрийн дүн:</b> <b>${totalFormatted}</b>
+💳 <b>Төлбөрийн хэлбэр:</b> ⚡ Bonum (QPay / Карт)
+${order.bonumInvoiceId ? `🧾 <b>Нэхэмжлэх ID:</b> <code>${escapeHtml(order.bonumInvoiceId)}</code>\n` : ''}
 🛒 <b>Захиалсан бүтээгдэхүүн:</b>
 ${itemsText || '  • Дижитал багц'}
 ━━━━━━━━━━━━━━━━━━━━
-👉 Доорх товчоор шууд баталгаажуулна уу:`
+ℹ️ <b>Автомат горим:</b> Bonum-оор төлбөр хийгдмэгц систем <b>автоматаар баталгаажуулна</b>. Админ Telegram дээр захиалга баталгаажуулах <b>шаардлагагүй</b>.`
+  }
+
+  return `🔔 <b>ШИНЭ ЗАХИАЛГА — ДАНС ШАЛГАЖ ЗААВАЛ БАТАЛГААЖУУЛНА УУ!</b>
+━━━━━━━━━━━━━━━━━━━━
+📦 <b>Захиалга:</b> <code>${escapeHtml(order.id)}</code>
+📅 <b>Огноо:</b> ${escapeHtml(dateStr)}
+
+👤 <b>Захиалагч:</b> ${escapeHtml(order.customerName)}
+📞 <b>Утас:</b> <code>${escapeHtml(order.customerPhone || 'Утасгүй')}</code>
+📧 <b>Gmail (Drive):</b> <code>${escapeHtml(order.customerEmail)}</code>
+
+💰 <b>Шилжүүлэх дүн:</b> <b>${totalFormatted}</b>
+💳 <b>Төлбөрийн хэлбэр:</b> 🏦 Дансаар шилжүүлэг (Хаан банк)
+📝 <b>Гүйлгээний утга:</b> <code>${escapeHtml(order.receiptNote || order.transferReference || order.id)}</code>
+🛒 <b>Захиалсан бүтээгдэхүүн:</b>
+${itemsText || '  • Дижитал багц'}
+━━━━━━━━━━━━━━━━━━━━
+⚠️ <b>АНХААРУУЛГА:</b> Хэрэглэгч Хаан банкны данс руу шилжүүлэг хийсэн эсэхийг дансны хуулгаасаа шалгаад <b>заавал доорх товч дээр дарж баталгаажуулна уу!</b>`
 }
 
 /**
@@ -240,15 +261,25 @@ export function formatOrderApprovedNotificationText(
     emailSent === undefined
       ? 'Илгээгдсэн ✓'
       : emailSent
-      ? 'Амжилттай хүргэгдсэн ✓'
-      : '⚠️ И-мэйл хүргэлт хүлээгдэж байна'
+        ? 'Амжилттай хүргэгдсэн ✓'
+        : '⚠️ И-мэйл хүргэлт хүлээгдэж байна'
 
-  const channelText =
-    order.paymentMethod === 'BONUM'
-      ? '⚡ Bonum (QPay / Карт)'
-      : order.paymentMethod === 'FREE_DOWNLOAD'
+  const isBonum = order.paymentMethod === 'BONUM'
+  const isFree =
+    (Number(order.totalAmountMNT || 0) === 0 && Number(order.totalAmountUSD || 0) === 0) ||
+    order.paymentMethod === 'FREE_DOWNLOAD'
+
+  const channelText = isBonum
+    ? '⚡ Bonum (QPay / Карт)'
+    : isFree
       ? '🎁 Үнэгүй таталт'
-      : (order.paymentMethod || 'Хаан Банк')
+      : '🏦 Хаан Банк (Дансаар шилжүүлэг)'
+
+  const approvalStatusText = isBonum
+    ? '⚡ Bonum гарцаар автоматаар баталгаажсан ✓ (Админ шалгах шаардлагагүй)'
+    : isFree
+      ? '🎁 Үнэгүй таталт (Шууд баталгаажсан ✓)'
+      : '✅ Админ дансаа шалгаж гараар баталгаажуулсан ✓'
 
   return `🎉 <b>ТӨЛБӨР БАТАЛГААЖЛАА! (ШУУД ТАТАХ ЭРХ НЭЭГДСЭН)</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -262,10 +293,11 @@ export function formatOrderApprovedNotificationText(
 💰 <b>Төлсөн дүн:</b> <b>${totalFormatted}</b>
 💳 <b>Суваг:</b> ${escapeHtml(channelText)}
 ${order.bonumInvoiceId ? `🧾 <b>Нэхэмжлэх ID:</b> <code>${escapeHtml(order.bonumInvoiceId)}</code>\n` : ''}
+🔓 <b>Баталгаажуулалт:</b> ${approvalStatusText}
 📥 <b>Татах суваг:</b> ${order.r2Key && order.weTransferLink ? 'Cloudflare R2 + Google Drive' : order.r2Key ? '☁️ Cloudflare R2' : '📁 Google Drive / WeTransfer'}
 ${order.weTransferLink ? `🔗 <b>Холбоос:</b> <a href="${escapeHtml(order.weTransferLink)}">Google Drive / Линк</a>\n` : ''}
 ✉️ <b>И-мэйл хүргэлт:</b> ${emailStatusText}
-🔓 <b>Татах эрх:</b> Шууд нээгдсэн (Идэвхтэй ✓)
+✨ <b>Татах эрх:</b> Хэрэглэгчид шууд нээгдсэн (Идэвхтэй ✓)
 
 🛒 <b>Захиалсан бүтээгдэхүүн:</b>
 ${itemsText || '  • Дижитал багц'}
@@ -314,41 +346,49 @@ export async function sendTelegramOrderNotification(
       (Number(order.totalAmountMNT || 0) === 0 && Number(order.totalAmountUSD || 0) === 0) ||
       order.paymentMethod === 'FREE_DOWNLOAD'
 
-    const replyMarkup = isFree
-      ? {
-          inline_keyboard: [
-            [
-              {
-                text: '👁 Хэрэглэгчийн татах хуудас',
-                url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
-              },
-              {
-                text: '⚙️ Админ самбар',
-                url: `${siteUrl}/admin`,
-              },
-            ],
+    const isBonum = order.paymentMethod === 'BONUM'
+
+    let replyMarkup: any
+
+    if (isFree || isBonum) {
+      // Free download or Bonum (automatic payment) -> NO manual approval button needed!
+      replyMarkup = {
+        inline_keyboard: [
+          [
+            {
+              text: '👁 Захиалгын хуудас',
+              url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
+            },
+            {
+              text: '⚙️ Админ самбар',
+              url: `${siteUrl}/admin`,
+            },
           ],
-        }
-      : {
-          inline_keyboard: [
-            [
-              {
-                text: '⚡ Данс шалгаж баталгаажуулах',
-                url: `${siteUrl}/api/admin/orders/quick-approve?orderId=${encodeURIComponent(order.id)}&token=${approvalToken}`,
-              },
-            ],
-            [
-              {
-                text: '👤 Захиалга харах',
-                url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
-              },
-              {
-                text: '⚙️ Админ самбар',
-                url: `${siteUrl}/admin`,
-              },
-            ],
+        ],
+      }
+    } else {
+      // Bank Transfer (Дансаар шилжүүлэх) -> MUST BE MANUALLY CHECKED AND APPROVED!
+      replyMarkup = {
+        inline_keyboard: [
+          [
+            {
+              text: '⚡ ДАНС ШАЛГАЖ БАТАЛГААЖУУЛАХ',
+              url: `${siteUrl}/api/admin/orders/quick-approve?orderId=${encodeURIComponent(order.id)}&token=${approvalToken}`,
+            },
           ],
-        }
+          [
+            {
+              text: '👤 Захиалга харах',
+              url: `${siteUrl}/order/${encodeURIComponent(order.id)}`,
+            },
+            {
+              text: '⚙️ Админ самбар',
+              url: `${siteUrl}/admin`,
+            },
+          ],
+        ],
+      }
+    }
 
     return await sendTelegramMessage({
       botToken,
