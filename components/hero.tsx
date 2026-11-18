@@ -205,24 +205,6 @@ export function Hero({
                 </div>
               </Link>
             </div>
-
-            {/* Promo Announcement Banner */}
-            <div className="mt-4 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-orange-500/10 border border-amber-500/25 text-amber-950 text-[12px] font-medium text-center flex items-center justify-center gap-2 shadow-xs">
-              <span className="relative flex h-2 w-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-              </span>
-              <span>{t('pkg_promo_banner')}</span>
-            </div>
-
-            {/* Trust & Guarantee info */}
-            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/80 text-center">
-              <span>🛡️ {t('pkg_onetime')}</span>
-              <span>•</span>
-              <span>⚡ Bonum (QPay & Карт)</span>
-              <span>•</span>
-              <span>📥 Шууд татах эрх</span>
-            </div>
           </FadeUp>
         </div>
 
