@@ -92,8 +92,32 @@ export function buildOrderDeliveryEmailHtml(params: {
           <div style="font-size: 12px; color: #a1a1aa; font-weight: normal; margin-top: 2px;">
             ${item.quantity > 1 ? `Тоо хэмжээ: ${item.quantity} · ` : ''}Лиценз: 100% Commercial Royalty-Free
           </div>
+          ${
+            Array.isArray(item.bundleProducts) && item.bundleProducts.length > 0
+              ? `
+            <div style="margin-top: 8px; padding-left: 10px; border-left: 2px solid #00B0FF; background: #18191b; padding: 8px 10px; border-radius: 6px;">
+              <div style="font-size: 11px; font-weight: 700; color: #f59e0b; margin-bottom: 6px; text-transform: uppercase;">
+                📦 Багцад багтсан бүтээгдэхүүнүүд:
+              </div>
+              ${item.bundleProducts
+                .map((bp: any) => {
+                  const link = bp.r2Key
+                    ? `${siteUrl}/api/orders/${order.id}/download?productId=${encodeURIComponent(bp.id)}`
+                    : (bp.weTransferLink || `${siteUrl}/order/${order.id}`)
+                  return `
+                  <div style="font-size: 12px; color: #e4e4e7; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>• <strong>${escapeHtml(bp.title)}</strong> ${bp.fileSize ? `<span style="color: #a1a1aa; font-size: 11px;">(${bp.fileSize})</span>` : ''}</span>
+                    <a href="${link}" target="_blank" style="color: #00B0FF; text-decoration: none; font-weight: bold; margin-left: 6px;">[Татах &rarr;]</a>
+                  </div>
+                `
+                })
+                .join('')}
+            </div>
+            `
+              : ''
+          }
         </td>
-        <td style="padding: 12px 0; color: #f4f4f5; font-size: 14px; text-align: right; font-family: monospace; font-weight: bold;">
+        <td style="padding: 12px 0; color: #f4f4f5; font-size: 14px; text-align: right; font-family: monospace; font-weight: bold; vertical-align: top;">
           ${order.currency === 'USD' ? `$${(item.priceUSD || 0).toFixed(2)}` : `${(item.price || 0).toLocaleString()}₮`}
         </td>
       </tr>
@@ -299,8 +323,32 @@ export function buildOrderCreatedEmailHtml(params: {
           <div style="font-size: 12px; color: #a1a1aa; font-weight: normal; margin-top: 2px;">
             ${item.quantity > 1 ? `Тоо хэмжээ: ${item.quantity} · ` : ''}Лиценз: 100% Commercial Royalty-Free
           </div>
+          ${
+            Array.isArray(item.bundleProducts) && item.bundleProducts.length > 0
+              ? `
+            <div style="margin-top: 8px; padding-left: 10px; border-left: 2px solid #00B0FF; background: #18191b; padding: 8px 10px; border-radius: 6px;">
+              <div style="font-size: 11px; font-weight: 700; color: #f59e0b; margin-bottom: 6px; text-transform: uppercase;">
+                📦 Багцад багтсан бүтээгдэхүүнүүд:
+              </div>
+              ${item.bundleProducts
+                .map((bp: any) => {
+                  const link = bp.r2Key
+                    ? `${siteUrl}/api/orders/${order.id}/download?productId=${encodeURIComponent(bp.id)}`
+                    : (bp.weTransferLink || `${siteUrl}/order/${order.id}`)
+                  return `
+                  <div style="font-size: 12px; color: #e4e4e7; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>• <strong>${escapeHtml(bp.title)}</strong> ${bp.fileSize ? `<span style="color: #a1a1aa; font-size: 11px;">(${bp.fileSize})</span>` : ''}</span>
+                    <a href="${link}" target="_blank" style="color: #00B0FF; text-decoration: none; font-weight: bold; margin-left: 6px;">[Татах &rarr;]</a>
+                  </div>
+                `
+                })
+                .join('')}
+            </div>
+            `
+              : ''
+          }
         </td>
-        <td style="padding: 12px 0; color: #f4f4f5; font-size: 14px; text-align: right; font-family: monospace; font-weight: bold;">
+        <td style="padding: 12px 0; color: #f4f4f5; font-size: 14px; text-align: right; font-family: monospace; font-weight: bold; vertical-align: top;">
           ${order.currency === 'USD' ? `$${(item.priceUSD || 0).toFixed(2)}` : `${(item.price || 0).toLocaleString()}₮`}
         </td>
       </tr>

@@ -19,6 +19,8 @@ import {
   Zap,
   CreditCard,
   QrCode,
+  Package,
+  Layers,
 } from 'lucide-react'
 import { InstagramIcon, TelegramIcon } from '@/components/icons/social'
 import { STORE_SETTINGS } from '@/lib/store-data'
@@ -30,6 +32,22 @@ interface OrderItem {
   price: number
   priceUSD: number
   quantity: number
+  image?: string
+  weTransferLink?: string | null
+  r2Key?: string | null
+  isBundle?: boolean
+  bundleProductIds?: string[]
+  bundleProducts?: Array<{
+    id: string
+    slug?: string
+    title: string
+    image?: string
+    fileSize?: string
+    fileFormats?: string[]
+    format?: string
+    weTransferLink?: string | null
+    r2Key?: string | null
+  }>
 }
 
 interface OrderData {
@@ -173,6 +191,44 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   }
 
   const [cancellingOrder, setCancellingOrder] = useState(false)
+  const [downloadingChildKey, setDownloadingChildKey] = useState<string | null>(null)
+  const [childR2Urls, setChildR2Urls] = useState<{ [key: string]: string }>({})
+
+  const handleDownloadChildR2 = async (key: string, title: string) => {
+    if (!order || !key) return
+    setDownloadingChildKey(key)
+    try {
+      const safeTitle = (title || 'soniq-product').trim().replace(/[/\\?%*:|"<>]/g, '_')
+      const filename = safeTitle.endsWith('.zip') ? safeTitle : `${safeTitle}.zip`
+      const res = await fetch('/api/r2/download-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key,
+          orderId: order.id,
+          filename,
+        }),
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'R2 татах холбоос үүсгэхэд алдаа гарлаа.')
+      }
+
+      setChildR2Urls((prev) => ({ ...prev, [key]: data.downloadUrl }))
+      const link = document.createElement('a')
+      link.href = data.downloadUrl
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err: unknown) {
+      const error = err as Error
+      alert(error.message || 'Файл татахад алдаа гарлаа.')
+    } finally {
+      setDownloadingChildKey(null)
+    }
+  }
 
   const handleCancelOrder = async () => {
     if (!order || cancellingOrder) return
@@ -334,141 +390,278 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
               </div>
 
               {/* Download Buttons Section */}
-              <div className="w-full max-w-md mt-6 space-y-3">
-                {order.r2Key && (
-                  <div className="space-y-2">
-                    <button
-                      onClick={handleDownloadR2}
-                      disabled={generatingR2}
-                      className="w-full py-4 px-6 rounded-full bg-[#141414] hover:bg-black text-white font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all shadow-md hover:shadow-xl cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      {generatingR2 ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 text-[#00B0FF] animate-spin" />
-                          <span>ТАТАХ ХОЛБООС ҮҮСГЭЖ БАЙНА...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Cloud className="w-4 h-4 text-[#00B0FF]" />
-                          <span>ШУУД ТАТАЖ АВАХ (R2 ӨНДӨР ХУРД)</span>
-                          <Download className="w-4 h-4 text-[#00B0FF] ml-1" />
-                        </>
-                      )}
-                    </button>
+              {(() => {
+                const allBundleProducts = (order.items || []).flatMap((it) => it.bundleProducts || [])
+                const hasBundleProducts = allBundleProducts.length > 0
 
-                    {r2Error && (
-                      <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center gap-1.5">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{r2Error}</span>
-                      </div>
-                    )}
-
-                    {r2DownloadUrl && (
-                      <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
-                        <span className="font-mono text-[10px] truncate max-w-[240px] text-zinc-500">
-                          {r2DownloadUrl}
-                        </span>
-                        <button
-                          onClick={() => handleCopyR2Link(r2DownloadUrl)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E6E6E3] text-zinc-700 font-semibold text-[10px] hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
-                        >
-                          {copiedR2Link ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-600" />
-                              <span>Хуулагдлаа</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>Линк хуулах</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(() => {
-                  const effectiveLink =
-                    order.weTransferLink ||
-                    (STORE_SETTINGS as any).defaultBundleWeTransfer ||
-                    'https://we.tl/t-soniq-ultimate-bundle-2026-vfx'
-
-                  if (!effectiveLink) return null
-
-                  const isGoogleDrive = effectiveLink.includes('drive.google.com')
-
+                if (hasBundleProducts) {
                   return (
-                    <div className="space-y-2">
-                      <a
-                        href={effectiveLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`w-full py-4 px-6 rounded-full font-extrabold text-xs sm:text-sm uppercase tracking-wide transition-all shadow-md hover:shadow-xl cursor-pointer flex items-center justify-center gap-2.5 ${
-                          order.r2Key
-                            ? 'bg-white hover:bg-zinc-50 text-zinc-900 border-2 border-emerald-500/80 shadow-emerald-500/10'
-                            : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/50 animate-pulse'
-                        }`}
-                      >
-                        <Download className="w-5 h-5 text-white" />
-                        <span>
-                          {isGoogleDrive
-                            ? (order.r2Key ? '📁 GOOGLE DRIVE ТАТАХ (НӨӨЦ ХОЛБООС)' : '📁 GOOGLE DRIVE-ААР ШУУД ТАТАХ')
-                            : (order.r2Key ? '⚡ WETRANSFER ТАТАХ (НӨӨЦ ХОЛБООС)' : '📥 ШУУД ТАТАЖ АВАХ (WETRANSFER)')}
-                        </span>
-                        <ExternalLink className="w-4 h-4 opacity-80 ml-1" />
-                      </a>
-
-                      {isGoogleDrive && (
-                        <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-left text-xs text-blue-950 space-y-1">
-                          <div className="font-bold flex items-center gap-1.5 text-blue-900">
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Google Drive хандах эрх нээгдсэн</span>
-                          </div>
-                          <p className="text-[11px] text-blue-800 leading-relaxed">
-                            Таны захиалга өгсөн <span className="font-mono font-bold text-blue-950 bg-blue-100/60 px-1 py-0.5 rounded">{order.customerEmail}</span> Gmail хаягт Google Drive-аар хандах эрх олгогдсон тул дээрх товч дээр дарж шууд татах эсвэл өөрийн Google Drive-даа хадгалж авна уу.
+                    <div className="w-full mt-6 space-y-4 text-left">
+                      <div className="flex items-center gap-2.5 p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-950">
+                        <Package className="w-5 h-5 text-amber-600 shrink-0" />
+                        <div>
+                          <h3 className="font-extrabold text-xs sm:text-sm text-amber-950 flex items-center gap-2">
+                            <span>БАГЦАД БАГТСАН БҮТЭЭГДЭХҮҮНҮҮД ТАТАХ ({allBundleProducts.length})</span>
+                            <span className="px-1.5 py-0.5 rounded bg-amber-500 text-white text-[10px] font-bold">НЭЭЛТТЭЙ</span>
+                          </h3>
+                          <p className="text-[11px] text-amber-900/80 mt-0.5 leading-relaxed">
+                            Энэхүү багцад багтсан бүтээгдэхүүн бүр өөрийн гэсэн файлтай тул тус бүрийн татах товч дээр даран шууд татаж авна уу.
                           </p>
                         </div>
-                      )}
+                      </div>
 
-                      {!order.r2Key && (
-                        <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
-                          <span className="font-mono text-[11px] truncate max-w-[240px]">
-                            {effectiveLink}
+                      <div className="space-y-2.5">
+                        {allBundleProducts.map((prod, idx) => {
+                          const prodR2Url = prod.r2Key ? childR2Urls[prod.r2Key] : null
+                          return (
+                            <div
+                              key={prod.id || idx}
+                              className="bg-[#FBFBFA] border border-[#E6E6E3] hover:border-zinc-300 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all shadow-2xs"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-zinc-100 shrink-0 border border-zinc-200">
+                                  {prod.image ? (
+                                    <img src={prod.image} alt={prod.title} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Package className="w-5 h-5 text-zinc-400 absolute inset-0 m-auto" />
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <h4 className="font-bold text-xs sm:text-sm text-zinc-900 truncate">
+                                    {prod.title}
+                                  </h4>
+                                  <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-500 flex-wrap">
+                                    {prod.fileSize && (
+                                      <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-[#E6E6E3] text-zinc-700 font-semibold text-[10px]">
+                                        {prod.fileSize}
+                                      </span>
+                                    )}
+                                    {prod.format && (
+                                      <span className="text-zinc-600 font-medium text-[10px]">{prod.format}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                                {prod.r2Key && (
+                                  <button
+                                    onClick={() => handleDownloadChildR2(prod.r2Key!, prod.title)}
+                                    disabled={downloadingChildKey === prod.r2Key}
+                                    className="py-2.5 px-4 rounded-lg bg-[#141414] hover:bg-black text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                  >
+                                    {downloadingChildKey === prod.r2Key ? (
+                                      <>
+                                        <RefreshCw className="w-3.5 h-3.5 text-[#00B0FF] animate-spin" />
+                                        <span>Бэлтгэж байна...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Cloud className="w-3.5 h-3.5 text-[#00B0FF]" />
+                                        <span>R2 ТАТАХ</span>
+                                        <Download className="w-3 h-3 ml-0.5 text-zinc-400" />
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+
+                                {prod.weTransferLink && (
+                                  <a
+                                    href={prod.weTransferLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>{prod.weTransferLink.includes('drive.google.com') ? 'GOOGLE DRIVE' : 'WETRANSFER'}</span>
+                                    <ExternalLink className="w-3 h-3 opacity-80" />
+                                  </a>
+                                )}
+
+                                {!prod.r2Key && !prod.weTransferLink && (
+                                  <span className="text-[11px] text-zinc-400 italic">
+                                    Холбоос бэлтгэгдэж байна
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Optional Master Backup Link if present */}
+                      {(order.r2Key || (order.weTransferLink && order.weTransferLink !== 'https://we.tl/t-soniq-ultimate-bundle-2026-vfx')) && (
+                        <div className="pt-4 border-t border-[#E6E6E3] space-y-2">
+                          <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider block">
+                            Нэмэлт нэгдсэн холбоос (Master Backup Link):
                           </span>
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(effectiveLink)
-                              setCopiedLink(true)
-                              setTimeout(() => setCopiedLink(false), 2000)
-                            }}
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-[#E6E6E3] text-zinc-700 font-semibold text-[11px] hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
-                          >
-                            {copiedLink ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-600" />
-                                <span>Хуулагдлаа</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3 h-3" />
-                                <span>Линк хуулах</span>
-                              </>
-                            )}
-                          </button>
+                          {order.r2Key && (
+                            <button
+                              onClick={handleDownloadR2}
+                              disabled={generatingR2}
+                              className="w-full py-3 px-4 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                            >
+                              <Cloud className="w-4 h-4 text-[#00B0FF]" />
+                              <span>БҮХ ФАЙЛЫГ НЭГ ДОР ТАТАХ (R2)</span>
+                            </button>
+                          )}
+                          {order.weTransferLink && (
+                            <a
+                              href={order.weTransferLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full py-3 px-4 rounded-xl bg-white border border-[#E6E6E3] hover:bg-zinc-50 text-zinc-800 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              <Download className="w-4 h-4 text-emerald-600" />
+                              <span>НЭГДСЭН WETRANSFER / DRIVE ЛИНК</span>
+                              <ExternalLink className="w-3.5 h-3.5 text-zinc-400" />
+                            </a>
+                          )}
                         </div>
                       )}
                     </div>
                   )
-                })()}
+                }
 
-                {!order.r2Key && !order.weTransferLink && (
-                  <div className="mt-3 p-2.5 rounded-lg bg-zinc-100 text-xs text-zinc-500">
-                    Линк бэлтгэгдэж байна, түр хүлээгээд хуудсаа дахин ачааллана уу.
+                // Single product download UI
+                return (
+                  <div className="w-full max-w-md mt-6 space-y-3">
+                    {order.r2Key && (
+                      <div className="space-y-2">
+                        <button
+                          onClick={handleDownloadR2}
+                          disabled={generatingR2}
+                          className="w-full py-4 px-6 rounded-full bg-[#141414] hover:bg-black text-white font-extrabold text-xs sm:text-sm uppercase tracking-wider transition-all shadow-md hover:shadow-xl cursor-pointer flex items-center justify-center gap-2"
+                        >
+                          {generatingR2 ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 text-[#00B0FF] animate-spin" />
+                              <span>ТАТАХ ХОЛБООС ҮҮСГЭЖ БАЙНА...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Cloud className="w-4 h-4 text-[#00B0FF]" />
+                              <span>ШУУД ТАТАЖ АВАХ (R2 ӨНДӨР ХУРД)</span>
+                              <Download className="w-4 h-4 text-[#00B0FF] ml-1" />
+                            </>
+                          )}
+                        </button>
+
+                        {r2Error && (
+                          <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center gap-1.5">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{r2Error}</span>
+                          </div>
+                        )}
+
+                        {r2DownloadUrl && (
+                          <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
+                            <span className="font-mono text-[10px] truncate max-w-[240px] text-zinc-500">
+                              {r2DownloadUrl}
+                            </span>
+                            <button
+                              onClick={() => handleCopyR2Link(r2DownloadUrl)}
+                              className="flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[#E6E6E3] text-zinc-700 font-semibold text-[10px] hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
+                            >
+                              {copiedR2Link ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-600" />
+                                  <span>Хуулагдлаа</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Линк хуулах</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {(() => {
+                      const effectiveLink =
+                        order.weTransferLink ||
+                        (STORE_SETTINGS as any).defaultBundleWeTransfer ||
+                        'https://we.tl/t-soniq-ultimate-bundle-2026-vfx'
+
+                      if (!effectiveLink) return null
+
+                      const isGoogleDrive = effectiveLink.includes('drive.google.com')
+
+                      return (
+                        <div className="space-y-2">
+                          <a
+                            href={effectiveLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`w-full py-4 px-6 rounded-full font-extrabold text-xs sm:text-sm uppercase tracking-wide transition-all shadow-md hover:shadow-xl cursor-pointer flex items-center justify-center gap-2.5 ${
+                              order.r2Key
+                                ? 'bg-white hover:bg-zinc-50 text-zinc-900 border-2 border-emerald-500/80 shadow-emerald-500/10'
+                                : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30 ring-2 ring-emerald-400/50 animate-pulse'
+                            }`}
+                          >
+                            <Download className="w-5 h-5 text-white" />
+                            <span>
+                              {isGoogleDrive
+                                ? (order.r2Key ? '📁 GOOGLE DRIVE ТАТАХ (НӨӨЦ ХОЛБООС)' : '📁 GOOGLE DRIVE-ААР ШУУД ТАТАХ')
+                                : (order.r2Key ? '⚡ WETRANSFER ТАТАХ (НӨӨЦ ХОЛБООС)' : '📥 ШУУД ТАТАЖ АВАХ (WETRANSFER)')}
+                            </span>
+                            <ExternalLink className="w-4 h-4 opacity-80 ml-1" />
+                          </a>
+
+                          {isGoogleDrive && (
+                            <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200 text-left text-xs text-blue-950 space-y-1">
+                              <div className="font-bold flex items-center gap-1.5 text-blue-900">
+                                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Google Drive хандах эрх нээгдсэн</span>
+                              </div>
+                              <p className="text-[11px] text-blue-800 leading-relaxed">
+                                Таны захиалга өгсөн <span className="font-mono font-bold text-blue-950 bg-blue-100/60 px-1 py-0.5 rounded">{order.customerEmail}</span> Gmail хаягт Google Drive-аар хандах эрх олгогдсон тул дээрх товч дээр дарж шууд татах эсвэл өөрийн Google Drive-даа хадгалж авна уу.
+                              </p>
+                            </div>
+                          )}
+
+                          {!order.r2Key && (
+                            <div className="flex items-center gap-2 bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-2 text-xs text-zinc-600 justify-between">
+                              <span className="font-mono text-[11px] truncate max-w-[240px]">
+                                {effectiveLink}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(effectiveLink)
+                                  setCopiedLink(true)
+                                  setTimeout(() => setCopiedLink(false), 2000)
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-[#E6E6E3] text-zinc-700 font-semibold text-[11px] hover:bg-zinc-50 transition-colors cursor-pointer shrink-0"
+                              >
+                                {copiedLink ? (
+                                  <>
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                    <span>Хуулагдлаа</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy className="w-3 h-3" />
+                                    <span>Линк хуулах</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+
+                    {!order.r2Key && !order.weTransferLink && (
+                      <div className="mt-3 p-2.5 rounded-lg bg-zinc-100 text-xs text-zinc-500">
+                        Линк бэлтгэгдэж байна, түр хүлээгээд хуудсаа дахин ачааллана уу.
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                )
+              })()}
 
               {/* Quick instructions */}
               <div className="mt-5 pt-4 border-t border-[#E6E6E3] grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-left w-full text-xs text-zinc-600">

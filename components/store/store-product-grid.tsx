@@ -61,9 +61,12 @@ export function StoreProductGrid() {
   })
 
   const storeCategories = Array.from(categoryMap.values())
+  const bundleCount = (products || []).filter((p) => p.isBundle).length
 
   const filteredProducts = (products || []).filter((product) => {
-    if (activeTab !== 'all' && (product.category || '').toLowerCase().trim() !== activeTab.toLowerCase().trim()) {
+    if (activeTab === 'bundles') {
+      if (!product.isBundle) return false
+    } else if (activeTab !== 'all' && (product.category || '').toLowerCase().trim() !== activeTab.toLowerCase().trim()) {
       return false
     }
     if (searchQuery.trim()) {
@@ -79,6 +82,7 @@ export function StoreProductGrid() {
 
   const categories = [
     { key: 'all', label: `Бүгд (${(products || []).length})` },
+    ...(bundleCount > 0 ? [{ key: 'bundles', label: `📦 Багцууд (${bundleCount})` }] : []),
     ...storeCategories.map((c) => {
       const count = (products || []).filter(
         (p) => (p.category || '').toLowerCase().trim() === c.id.toLowerCase().trim()

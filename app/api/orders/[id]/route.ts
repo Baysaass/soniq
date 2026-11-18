@@ -69,12 +69,54 @@ export async function GET(
     // If order is approved, return full details including download links!
     const isApproved = order.status === 'APPROVED'
 
+    // Enrich items with bundle products dynamically
+    const allProducts = await db.getProducts().catch(() => [])
+
+    const enrichedItems = (order.items || []).map((item: any) => {
+      let bundleProducts = Array.isArray(item.bundleProducts) ? [...item.bundleProducts] : []
+
+      // If bundleProducts is empty but product is a bundle, dynamically resolve from DB products
+      if (bundleProducts.length === 0) {
+        const prod = allProducts.find((p) => p.id === item.id || p.slug === item.id)
+        if (prod && (prod.isBundle || (Array.isArray(prod.bundleProductIds) && prod.bundleProductIds.length > 0))) {
+          const childIds = prod.bundleProductIds || []
+          bundleProducts = allProducts
+            .filter((p) => childIds.includes(p.id) || childIds.includes(p.slug))
+            .map((bp) => ({
+              id: bp.id,
+              slug: bp.slug,
+              title: bp.title,
+              image: bp.image,
+              fileSize: bp.fileSize || '',
+              fileFormats: bp.fileFormats || [],
+              format: bp.format || '',
+              weTransferLink: bp.defaultWeTransferLink || '',
+              r2Key: bp.r2Key || '',
+            }))
+        }
+      }
+
+      // Security: only expose download links if order is approved
+      const securedBundleProducts = bundleProducts.map((bp: any) => ({
+        ...bp,
+        weTransferLink: isApproved ? (bp.weTransferLink || null) : null,
+        r2Key: isApproved ? (bp.r2Key || null) : null,
+      }))
+
+      return {
+        ...item,
+        weTransferLink: isApproved ? (item.weTransferLink || null) : null,
+        r2Key: isApproved ? (item.r2Key || null) : null,
+        bundleProducts: securedBundleProducts,
+      }
+    })
+
     return NextResponse.json({
       id: order.id,
       createdAt: order.createdAt,
       customerName: order.customerName,
       customerEmail: order.customerEmail,
-      items: order.items,
+      items: enrichedItems,
       totalAmountMNT: order.totalAmountMNT,
       totalAmountUSD: order.totalAmountUSD,
       currency: order.currency,

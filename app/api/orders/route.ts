@@ -29,11 +29,31 @@ export async function POST(request: Request) {
     }
 
     // Enrich items with fresh product download metadata from DB
+    const allProducts = await db.getProducts().catch(() => [])
+
     const enrichedItems = await Promise.all(
       (items as any[]).map(async (item) => {
         try {
           const product = await db.getProductById(item.id)
           if (product) {
+            let bundleProductsData: any[] = []
+            const isBundle = Boolean(product.isBundle || (Array.isArray(product.bundleProductIds) && product.bundleProductIds.length > 0))
+            if (isBundle && Array.isArray(product.bundleProductIds) && product.bundleProductIds.length > 0) {
+              bundleProductsData = allProducts
+                .filter((p) => product.bundleProductIds?.includes(p.id) || product.bundleProductIds?.includes(p.slug))
+                .map((bp) => ({
+                  id: bp.id,
+                  slug: bp.slug,
+                  title: bp.title,
+                  image: bp.image,
+                  fileSize: bp.fileSize || '',
+                  fileFormats: bp.fileFormats || [],
+                  format: bp.format || '',
+                  weTransferLink: bp.defaultWeTransferLink || '',
+                  r2Key: bp.r2Key || '',
+                }))
+            }
+
             return {
               ...item,
               title: product.title || item.title,
@@ -42,6 +62,9 @@ export async function POST(request: Request) {
               image: product.image || item.image,
               weTransferLink: product.defaultWeTransferLink || item.weTransferLink || '',
               r2Key: product.r2Key || item.r2Key || '',
+              isBundle,
+              bundleProductIds: product.bundleProductIds || [],
+              bundleProducts: bundleProductsData,
             }
           }
         } catch (e) {

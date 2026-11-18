@@ -50,6 +50,54 @@ export async function GET(
       )
     }
 
+    const { searchParams } = new URL(request.url)
+    const targetProductId = searchParams.get('productId') || searchParams.get('id') || ''
+
+    // If a specific product in a bundle/order was requested
+    if (targetProductId) {
+      // Find from items or child bundle products
+      let matchedProduct: any = null
+      for (const item of (order.items || []) as any[]) {
+        if (item.id === targetProductId || item.slug === targetProductId) {
+          matchedProduct = item
+          break
+        }
+        if (Array.isArray(item.bundleProducts)) {
+          const bp = item.bundleProducts.find((p: any) => p.id === targetProductId || p.slug === targetProductId)
+          if (bp) {
+            matchedProduct = bp
+            break
+          }
+        }
+      }
+
+      if (!matchedProduct) {
+        // Fallback: look up in DB
+        matchedProduct = await db.getProductById(targetProductId).catch(() => null)
+      }
+
+      if (matchedProduct) {
+        const prodR2 = matchedProduct.r2Key
+        if (prodR2 && (await isR2Configured())) {
+          try {
+            const presigned = await generatePresignedDownloadUrl({
+              key: prodR2,
+              downloadFilename: `${matchedProduct.title || 'soniq-product'}.zip`,
+              expiresInSeconds: 86400,
+            })
+            return NextResponse.redirect(presigned.downloadUrl, 302)
+          } catch (err) {
+            console.error('Error creating presigned URL for child product:', err)
+          }
+        }
+
+        const prodWeTransfer = matchedProduct.weTransferLink || matchedProduct.defaultWeTransferLink
+        if (prodWeTransfer && prodWeTransfer.startsWith('http')) {
+          return NextResponse.redirect(prodWeTransfer, 302)
+        }
+      }
+    }
+
     // If R2 key is present and configured, generate signed download URL
     const r2Key = order.r2Key || (order.items && order.items.find((i) => i.r2Key)?.r2Key)
     if (r2Key && (await isR2Configured())) {

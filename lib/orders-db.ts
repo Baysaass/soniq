@@ -8,8 +8,21 @@ export interface OrderItem {
   priceUSD: number
   image: string
   quantity: number
-  weTransferLink?: string
-  r2Key?: string
+  weTransferLink?: string | null
+  r2Key?: string | null
+  isBundle?: boolean
+  bundleProductIds?: string[]
+  bundleProducts?: Array<{
+    id: string
+    slug?: string
+    title: string
+    image?: string
+    fileSize?: string
+    fileFormats?: string[]
+    format?: string
+    weTransferLink?: string | null
+    r2Key?: string | null
+  }>
 }
 
 export type OrderStatus = 'PENDING' | 'APPROVED' | 'CANCELLED'

@@ -110,7 +110,7 @@ export default function AdminPage() {
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed) && parsed.length > 0) return parsed
         }
-      } catch {}
+      } catch { }
     }
     return []
   })
@@ -128,6 +128,49 @@ export default function AdminPage() {
   const [showR2InModal, setShowR2InModal] = useState(false)
   const [deliveryTypeInModal, setDeliveryTypeInModal] = useState<'drive' | 'r2' | 'both'>('drive')
 
+  // Dedicated Bundle Studio State
+  const [isBundleStudioOpen, setIsBundleStudioOpen] = useState(false)
+  const [bundleStudioError, setBundleStudioError] = useState('')
+  const [bundleStudioSearch, setBundleStudioSearch] = useState('')
+  const [savingBundle, setSavingBundle] = useState(false)
+  const [bundleStudioData, setBundleStudioData] = useState<{
+    id: string
+    slug: string
+    title: string
+    subtitle: string
+    category: string
+    badge: string
+    bundleProductIds: string[]
+    discountPercent: number
+    priceMNT: number
+    originalPriceMNT: number
+    priceUSD: number
+    originalPriceUSD: number
+    image: string
+    images: string[]
+    description: string
+    defaultWeTransferLink: string
+    r2Key: string
+  }>({
+    id: '',
+    slug: '',
+    title: '',
+    subtitle: '',
+    category: 'sfx',
+    badge: '40% ХЭМНЭЛТ',
+    bundleProductIds: [],
+    discountPercent: 40,
+    priceMNT: 0,
+    originalPriceMNT: 0,
+    priceUSD: 0,
+    originalPriceUSD: 0,
+    image: '',
+    images: [],
+    description: '',
+    defaultWeTransferLink: '',
+    r2Key: '',
+  })
+
   // Orders State
   const [orders, setOrders] = useState<Order[]>(() => {
     if (typeof window !== 'undefined') {
@@ -137,7 +180,7 @@ export default function AdminPage() {
           const parsed = JSON.parse(cached)
           if (Array.isArray(parsed) && parsed.length > 0) return parsed
         }
-      } catch {}
+      } catch { }
     }
     return []
   })
@@ -355,6 +398,247 @@ export default function AdminPage() {
     })
   }
 
+  // Dedicated Bundle Studio Handlers
+  const openNewBundleStudio = () => {
+    const activeNonBundles = products.filter((p) => !p.isBundle)
+    const allIds = activeNonBundles.map((p) => p.id)
+    const sumMNT = activeNonBundles.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
+    const rate = exchangeRate > 0 ? exchangeRate : 3600
+    const sumUSD = Number((sumMNT / rate).toFixed(2))
+
+    const discount = 40
+    const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : 49900
+    const saleUSD = Number((saleMNT / rate).toFixed(2))
+    const firstImg = activeNonBundles[0]?.image || '/images/product-morph-3d.png'
+
+    setBundleStudioData({
+      id: '',
+      slug: `bundle-${Date.now()}`,
+      title: 'ALL-IN-ONE CREATOR BUNDLE',
+      subtitle: 'Бүх шилдэг багцуудын нэгдсэн цуглуулга',
+      category: 'sfx',
+      badge: `${discount}% ХЭМНЭЛТ`,
+      bundleProductIds: allIds,
+      discountPercent: discount,
+      priceMNT: saleMNT,
+      originalPriceMNT: sumMNT > 0 ? sumMNT : 89000,
+      priceUSD: saleUSD,
+      originalPriceUSD: sumUSD > 0 ? sumUSD : 25,
+      image: firstImg,
+      images: [firstImg],
+      description: 'Энэхүү онцлох багцад манай дэлгүүрийн бүх шилдэг бүтээгдэхүүнүүд багтсан бөгөөд худалдан авмагц тус бүрийн файл шууд нээгдэнэ.',
+      defaultWeTransferLink: '',
+      r2Key: '',
+    })
+    setBundleStudioSearch('')
+    setBundleStudioError('')
+    setIsBundleStudioOpen(true)
+  }
+
+  const openEditBundleStudio = (p: StoreProduct) => {
+    const selectedIds = Array.isArray(p.bundleProductIds) ? p.bundleProductIds : []
+    const selectedProds = products.filter((item) => selectedIds.includes(item.id) || selectedIds.includes(item.slug))
+    const sumMNT = selectedProds.length > 0
+      ? selectedProds.reduce((acc, item) => acc + (Number(item.priceMNT) || 0), 0)
+      : (p.originalPriceMNT || p.priceMNT)
+    const rate = exchangeRate > 0 ? exchangeRate : 3600
+    const sumUSD = Number((sumMNT / rate).toFixed(2))
+    const discount = p.discountPercent || 40
+
+    setBundleStudioData({
+      id: p.id,
+      slug: p.slug,
+      title: p.title,
+      subtitle: p.subtitle || '',
+      category: p.category || 'sfx',
+      badge: p.badge || `${discount}% ХЭМНЭЛТ`,
+      bundleProductIds: selectedIds,
+      discountPercent: discount,
+      priceMNT: p.priceMNT,
+      originalPriceMNT: p.originalPriceMNT || sumMNT,
+      priceUSD: p.priceUSD,
+      originalPriceUSD: p.originalPriceUSD || sumUSD,
+      image: p.image || '/images/product-morph-3d.png',
+      images: Array.isArray(p.images) && p.images.length > 0 ? p.images : (p.image ? [p.image] : []),
+      description: p.description || '',
+      defaultWeTransferLink: p.defaultWeTransferLink || '',
+      r2Key: p.r2Key || '',
+    })
+    setBundleStudioSearch('')
+    setBundleStudioError('')
+    setIsBundleStudioOpen(true)
+  }
+
+  const toggleBundleStudioProduct = (prodId: string) => {
+    const current = [...bundleStudioData.bundleProductIds]
+    const exists = current.includes(prodId)
+    const nextIds = exists ? current.filter((id) => id !== prodId) : [...current, prodId]
+
+    const selectedProds = products.filter((p) => nextIds.includes(p.id) || nextIds.includes(p.slug))
+    const sumMNT = selectedProds.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
+    const rate = exchangeRate > 0 ? exchangeRate : 3600
+    const sumUSD = Number((sumMNT / rate).toFixed(2))
+
+    const discount = bundleStudioData.discountPercent || 40
+    const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : 0
+    const saleUSD = Number((saleMNT / rate).toFixed(2))
+
+    const firstImg = selectedProds[0]?.image || bundleStudioData.image || '/images/product-morph-3d.png'
+
+    setBundleStudioData({
+      ...bundleStudioData,
+      bundleProductIds: nextIds,
+      originalPriceMNT: sumMNT,
+      originalPriceUSD: sumUSD,
+      priceMNT: saleMNT,
+      priceUSD: saleUSD,
+      image: bundleStudioData.image ? bundleStudioData.image : firstImg,
+    })
+  }
+
+  const selectAllBundleStudioProducts = () => {
+    const currentId = bundleStudioData.id
+    const allNonBundles = products.filter((p) => p.id !== currentId && !p.isBundle)
+    const allIds = allNonBundles.map((p) => p.id)
+
+    const sumMNT = allNonBundles.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
+    const rate = exchangeRate > 0 ? exchangeRate : 3600
+    const sumUSD = Number((sumMNT / rate).toFixed(2))
+
+    const discount = bundleStudioData.discountPercent || 40
+    const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : 0
+    const saleUSD = Number((saleMNT / rate).toFixed(2))
+
+    setBundleStudioData({
+      ...bundleStudioData,
+      bundleProductIds: allIds,
+      originalPriceMNT: sumMNT,
+      originalPriceUSD: sumUSD,
+      priceMNT: saleMNT,
+      priceUSD: saleUSD,
+    })
+  }
+
+  const clearAllBundleStudioProducts = () => {
+    setBundleStudioData({
+      ...bundleStudioData,
+      bundleProductIds: [],
+      originalPriceMNT: 0,
+      originalPriceUSD: 0,
+      priceMNT: 0,
+      priceUSD: 0,
+    })
+  }
+
+  const applyBundleStudioDiscount = (percent: number) => {
+    const safePercent = Math.min(99, Math.max(1, percent))
+    const sumMNT = bundleStudioData.originalPriceMNT
+    const rate = exchangeRate > 0 ? exchangeRate : 3600
+
+    const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - safePercent / 100)) / 100) * 100 : bundleStudioData.priceMNT
+    const saleUSD = Number((saleMNT / rate).toFixed(2))
+
+    setBundleStudioData({
+      ...bundleStudioData,
+      discountPercent: safePercent,
+      priceMNT: saleMNT,
+      priceUSD: saleUSD,
+      badge: `${safePercent}% ХЭМНЭЛТ`,
+    })
+  }
+
+  const handleSaveBundleStudio = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBundleStudioError('')
+
+    if (!bundleStudioData.title || !bundleStudioData.title.trim()) {
+      setBundleStudioError('Багцын нэрийг оруулна уу.')
+      return
+    }
+
+    if (bundleStudioData.bundleProductIds.length === 0) {
+      setBundleStudioError('Багцад хамгийн багадаа 1 бүтээгдэхүүн сонгоно уу.')
+      return
+    }
+
+    setSavingBundle(true)
+    try {
+      const activePasscode = passcode || (typeof window !== 'undefined' ? (sessionStorage.getItem('soniq_admin_passcode') || localStorage.getItem('soniq_admin_passcode')) : '') || 'Amirda700+'
+      const isEdit = Boolean(bundleStudioData.id && bundleStudioData.id.trim())
+      const targetId = bundleStudioData.id ? encodeURIComponent(bundleStudioData.id.trim()) : ''
+      const url = isEdit ? `/api/products/${targetId}` : '/api/products'
+      const method = isEdit ? 'PUT' : 'POST'
+
+      const selectedProds = products.filter((p) => bundleStudioData.bundleProductIds.includes(p.id) || bundleStudioData.bundleProductIds.includes(p.slug))
+
+      // Auto-aggregate formats
+      const formatSet = new Set<string>()
+      selectedProds.forEach((p) => {
+        if (Array.isArray(p.fileFormats)) p.fileFormats.forEach((f) => formatSet.add(f))
+        if (p.format) p.format.split(',').forEach((f) => formatSet.add(f.trim()))
+      })
+      const cleanFormats = Array.from(formatSet).filter(Boolean)
+
+      // Auto-aggregate features
+      const cleanFeatures = [
+        ...selectedProds.map((p) => `✓ ${p.title} багтсан`),
+        '100% Royalty Free арилжааны лицензтэй',
+        'WeTransfer & Google Drive шууд таталт',
+        'Насан туршийн эрх · Цаашдын шинэчлэлт үнэгүй',
+      ]
+
+      const chosenImg = bundleStudioData.image || selectedProds[0]?.image || '/images/product-morph-3d.png'
+
+      const payload = {
+        id: bundleStudioData.id || undefined,
+        slug: (bundleStudioData.slug || '').trim() || `bundle-${Date.now()}`,
+        title: bundleStudioData.title.trim(),
+        subtitle: (bundleStudioData.subtitle || '').trim() || `${selectedProds.length} шилдэг багцын нэгдсэн цуглуулга`,
+        category: bundleStudioData.category || 'sfx',
+        badge: bundleStudioData.badge || `${bundleStudioData.discountPercent}% ХЭМНЭЛТ`,
+        isBundle: true,
+        bundleProductIds: bundleStudioData.bundleProductIds,
+        discountPercent: bundleStudioData.discountPercent,
+        priceMNT: Math.round(Number(bundleStudioData.priceMNT) || 0),
+        originalPriceMNT: Math.round(Number(bundleStudioData.originalPriceMNT) || 0),
+        priceUSD: Number(bundleStudioData.priceUSD) || 0,
+        originalPriceUSD: Number(bundleStudioData.originalPriceUSD) || 0,
+        image: chosenImg,
+        images: [chosenImg],
+        description: bundleStudioData.description || `Энэхүү онцлох багцад дараах ${selectedProds.length} бүтээгдэхүүн багтсан болно.`,
+        features: cleanFeatures,
+        fileFormats: cleanFormats,
+        format: cleanFormats.join(', '),
+        defaultWeTransferLink: (bundleStudioData.defaultWeTransferLink || '').trim(),
+        r2Key: (bundleStudioData.r2Key || '').trim(),
+        isFree: false,
+        passcode: activePasscode,
+      }
+
+      const res = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-passcode': activePasscode,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Багц хадгалахад алдаа гарлаа.')
+      }
+
+      await fetchProducts(true)
+      setIsBundleStudioOpen(false)
+      alert(isEdit ? 'Bundle амжилттай шинэчлэгдлээ!' : 'Шинэ Bundle амжилттай үүсгэгдлээ!')
+    } catch (err: any) {
+      setBundleStudioError(err.message || 'Алдаа гарлаа.')
+    } finally {
+      setSavingBundle(false)
+    }
+  }
+
   // Fetch Email Status
   const fetchEmailStatus = async (codeToUse?: string) => {
     const pc = codeToUse || passcode
@@ -403,7 +687,7 @@ export default function AdminPage() {
             try {
               sessionStorage.setItem('soniq_admin_passcode', saved)
               localStorage.setItem('soniq_admin_passcode', saved)
-            } catch {}
+            } catch { }
             fetchProducts()
             fetchOrders(saved)
             fetchSettings(saved)
@@ -413,7 +697,7 @@ export default function AdminPage() {
             try {
               sessionStorage.removeItem('soniq_admin_passcode')
               localStorage.removeItem('soniq_admin_passcode')
-            } catch {}
+            } catch { }
           }
         })
         .catch(() => {
@@ -439,7 +723,7 @@ export default function AdminPage() {
         try {
           sessionStorage.setItem('soniq_admin_passcode', passcode)
           localStorage.setItem('soniq_admin_passcode', passcode)
-        } catch {}
+        } catch { }
         setAuthError('')
         fetchExchangeRate()
         fetchProducts()
@@ -561,7 +845,7 @@ export default function AdminPage() {
           setProducts(data.products)
           try {
             localStorage.setItem('soniq_products_cache', JSON.stringify(data.products))
-          } catch {}
+          } catch { }
         }
       }
     } catch (err) {
@@ -591,7 +875,7 @@ export default function AdminPage() {
         setOrders(fetchedOrders)
         try {
           localStorage.setItem('soniq_orders_cache', JSON.stringify(fetchedOrders))
-        } catch {}
+        } catch { }
       }
     } catch (err) {
       console.error('Failed to fetch orders:', err)
@@ -986,25 +1270,32 @@ export default function AdminPage() {
       let finalWeTransferLink = (editingProduct.defaultWeTransferLink || '').trim()
       let finalR2Key = (editingProduct.r2Key || '').trim()
 
-      if (deliveryTypeInModal === 'drive') {
-        finalR2Key = ''
-        if (!finalWeTransferLink) {
-          setProductModalError('Google Drive / Татах холбоосоо оруулна уу.')
-          setSavingProduct(false)
-          return
-        }
-      } else if (deliveryTypeInModal === 'r2') {
-        finalWeTransferLink = ''
-        if (!finalR2Key) {
-          setProductModalError('Cloudflare R2 дээр файл байршуулах эсвэл R2 түлхүүрээ оруулна уу.')
-          setSavingProduct(false)
-          return
-        }
-      } else {
-        if (!finalWeTransferLink && !finalR2Key) {
-          setProductModalError('Google Drive холбоос эсвэл R2 түлхүүрийн аль нэгийг заавал оруулна уу.')
-          setSavingProduct(false)
-          return
+      const isBundleProduct = Boolean(
+        editingProduct.isBundle ||
+        (Array.isArray(editingProduct.bundleProductIds) && editingProduct.bundleProductIds.length > 0)
+      )
+
+      if (!isBundleProduct) {
+        if (deliveryTypeInModal === 'drive') {
+          finalR2Key = ''
+          if (!finalWeTransferLink) {
+            setProductModalError('Google Drive / Татах холбоосоо оруулна уу.')
+            setSavingProduct(false)
+            return
+          }
+        } else if (deliveryTypeInModal === 'r2') {
+          finalWeTransferLink = ''
+          if (!finalR2Key) {
+            setProductModalError('Cloudflare R2 дээр файл байршуулах эсвэл R2 түлхүүрээ оруулна уу.')
+            setSavingProduct(false)
+            return
+          }
+        } else {
+          if (!finalWeTransferLink && !finalR2Key) {
+            setProductModalError('Google Drive холбоос эсвэл R2 түлхүүрийн аль нэгийг заавал оруулна уу.')
+            setSavingProduct(false)
+            return
+          }
         }
       }
 
@@ -1064,7 +1355,7 @@ export default function AdminPage() {
           const updatedList = [data.product, ...filtered]
           try {
             localStorage.setItem('soniq_products_cache', JSON.stringify(updatedList))
-          } catch {}
+          } catch { }
           return updatedList
         })
       }
@@ -1311,7 +1602,9 @@ export default function AdminPage() {
 
   // Filter products
   const filteredProducts = products.filter((p) => {
-    if (productCategoryFilter !== 'all' && (p.category || '').toLowerCase().trim() !== productCategoryFilter.toLowerCase().trim()) {
+    if (productCategoryFilter === 'bundles') {
+      if (!p.isBundle) return false
+    } else if (productCategoryFilter !== 'all' && (p.category || '').toLowerCase().trim() !== productCategoryFilter.toLowerCase().trim()) {
       return false
     }
     if (productSearch.trim()) {
@@ -1413,11 +1706,10 @@ export default function AdminPage() {
           <div className="flex items-center gap-1 bg-[#F7F7F5] p-1 rounded-full border border-[#E6E6E3] text-xs">
             <button
               onClick={() => setActiveTab('products')}
-              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'products'
+              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'products'
                   ? 'bg-white text-[#141414] shadow-xs'
                   : 'text-zinc-600 hover:text-black'
-              }`}
+                }`}
             >
               <Package className="w-3.5 h-3.5 text-[#00B0FF]" />
               <span>Бүтээгдэхүүн ({products.length})</span>
@@ -1428,11 +1720,10 @@ export default function AdminPage() {
                 setActiveTab('orders')
                 fetchOrders(passcode)
               }}
-              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'orders'
+              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'orders'
                   ? 'bg-white text-[#141414] shadow-xs'
                   : 'text-zinc-600 hover:text-black'
-              }`}
+                }`}
             >
               <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
               <span>Захиалга</span>
@@ -1448,11 +1739,10 @@ export default function AdminPage() {
                 setActiveTab('settings')
                 fetchDBStatus()
               }}
-              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'settings'
+              className={`px-3 py-1 rounded-full font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${activeTab === 'settings'
                   ? 'bg-white text-[#141414] shadow-xs'
                   : 'text-zinc-600 hover:text-black'
-              }`}
+                }`}
             >
               <Settings className="w-3.5 h-3.5 text-zinc-500" />
               <span>Дэлгүүрийн тохиргоо</span>
@@ -1521,6 +1811,15 @@ export default function AdminPage() {
                 </button>
 
                 <button
+                  onClick={openNewBundleStudio}
+                  className="py-2 px-3.5 rounded-full bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs hover:shadow-md"
+                  title="Одоо байгаа бүтээгдэхүүнүүдийг сонгон 1 товшилтоор хямдралтай Bundle үүсгэх"
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>📦 Шинэ Bundle үүсгэх</span>
+                </button>
+
+                <button
                   onClick={openNewProductModal}
                   className="py-2 px-3.5 rounded-full bg-[#141414] hover:bg-black text-white text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
                 >
@@ -1548,23 +1847,24 @@ export default function AdminPage() {
                     }
                   })
                   const allCats = Array.from(catMap.values())
+                  const bundleCount = products.filter((p) => p.isBundle).length
 
                   return [
                     { key: 'all', label: `Бүгд (${products.length})` },
+                    ...(bundleCount > 0 ? [{ key: 'bundles', label: `📦 Bundles (${bundleCount})` }] : []),
                     ...allCats.map((c) => ({
                       key: c.id,
-                      label: `${c.name} (${products.filter((p) => (p.category || '').toLowerCase().trim() === c.id.toLowerCase().trim()).length})`,
+                      label: `${c.name} (${products.filter((p) => (p.category || '').toLowerCase().trim() === c.id.toLowerCase().trim() && !p.isBundle).length})`,
                     })),
                   ]
                 })().map((cat) => (
                   <button
                     key={cat.key}
                     onClick={() => setProductCategoryFilter(cat.key)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                      productCategoryFilter === cat.key
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${productCategoryFilter === cat.key
                         ? 'bg-[#141414] text-white'
                         : 'bg-[#F7F7F5] text-zinc-600 hover:bg-zinc-200/70'
-                    }`}
+                      }`}
                   >
                     {cat.label}
                   </button>
@@ -1773,11 +2073,10 @@ export default function AdminPage() {
                           <td className="py-3 px-3">
                             <button
                               onClick={() => handleToggleBundle(p)}
-                              className={`px-2 py-0.8 rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 ${
-                                p.isBundle
+                              className={`px-2 py-0.8 rounded text-[10px] font-bold transition-colors cursor-pointer flex items-center gap-1 ${p.isBundle
                                   ? 'bg-amber-100 text-amber-800 border border-amber-300'
                                   : 'bg-zinc-100 text-zinc-400 hover:text-zinc-700'
-                              }`}
+                                }`}
                               title="Дэлгүүрийн нүүрний онцлох Ultimate Bundle болгох"
                             >
                               <Sparkles className="w-3 h-3 text-amber-600" />
@@ -1795,6 +2094,17 @@ export default function AdminPage() {
                               >
                                 <Eye className="w-3.5 h-3.5" />
                               </Link>
+
+                              {p.isBundle && (
+                                <button
+                                  onClick={() => openEditBundleStudio(p)}
+                                  className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  title="Bundle Studio-оор засах"
+                                >
+                                  <Layers className="w-2.5 h-2.5" />
+                                  <span>Bundle засах</span>
+                                </button>
+                              )}
 
                               <button
                                 onClick={() => openEditProductModal(p)}
@@ -1879,11 +2189,10 @@ export default function AdminPage() {
 
             {approvalSuccessInfo && (
               <div
-                className={`mb-4 p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${
-                  approvalSuccessInfo.emailSent
+                className={`mb-4 p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs ${approvalSuccessInfo.emailSent
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                     : 'bg-amber-50 border-amber-200 text-amber-900'
-                }`}
+                  }`}
               >
                 <div className="flex items-start gap-2.5">
                   {approvalSuccessInfo.emailSent ? (
@@ -1937,11 +2246,10 @@ export default function AdminPage() {
                   <button
                     key={tab.key}
                     onClick={() => setOrderFilterStatus(tab.key as any)}
-                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
-                      orderFilterStatus === tab.key
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${orderFilterStatus === tab.key
                         ? 'bg-[#141414] text-white'
                         : 'bg-[#F7F7F5] text-zinc-600 hover:bg-zinc-200/70'
-                    }`}
+                      }`}
                   >
                     {tab.label}
                   </button>
@@ -2487,11 +2795,10 @@ export default function AdminPage() {
 
                 {telegramTestResult && (
                   <div
-                    className={`p-2.5 rounded-lg text-xs flex items-start gap-2 ${
-                      telegramTestResult.success
+                    className={`p-2.5 rounded-lg text-xs flex items-start gap-2 ${telegramTestResult.success
                         ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                         : 'bg-red-50 text-red-800 border border-red-200'
-                    }`}
+                      }`}
                   >
                     {telegramTestResult.success ? (
                       <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -2714,9 +3021,8 @@ export default function AdminPage() {
 
                   {r2TestResult && (
                     <span
-                      className={`text-xs font-semibold flex items-center gap-1 ${
-                        r2TestResult.success ? 'text-emerald-700' : 'text-red-600'
-                      }`}
+                      className={`text-xs font-semibold flex items-center gap-1 ${r2TestResult.success ? 'text-emerald-700' : 'text-red-600'
+                        }`}
                     >
                       {r2TestResult.success ? (
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
@@ -2738,13 +3044,12 @@ export default function AdminPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                        dbStatus?.provider === 'supabase'
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono ${dbStatus?.provider === 'supabase'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : dbStatus?.provider === 'postgres'
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : 'bg-zinc-100 text-zinc-700 border border-zinc-200'
-                      }`}
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-zinc-100 text-zinc-700 border border-zinc-200'
+                        }`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${dbStatus?.connected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                       <span>{dbStatus?.provider === 'supabase' ? 'Supabase PostgreSQL' : dbStatus?.provider === 'postgres' ? 'PostgreSQL Direct' : 'Local Persistent DB'}</span>
@@ -2804,11 +3109,10 @@ export default function AdminPage() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                        emailStatus?.hasKey
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold font-mono ${emailStatus?.hasKey
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : 'bg-red-50 text-red-700 border border-red-200'
-                      }`}
+                        }`}
                     >
                       <span className={`w-1.5 h-1.5 rounded-full ${emailStatus?.hasKey ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
                       <span>{emailStatus?.hasKey ? 'Resend API Холбогдсон' : 'RESEND_API_KEY байхгүй'}</span>
@@ -2906,11 +3210,10 @@ export default function AdminPage() {
 
                   {emailTestResult && (
                     <div
-                      className={`p-2.5 rounded-lg text-xs flex items-start gap-2 ${
-                        emailTestResult.success
+                      className={`p-2.5 rounded-lg text-xs flex items-start gap-2 ${emailTestResult.success
                           ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
                           : 'bg-red-50 border border-red-200 text-red-800'
-                      }`}
+                        }`}
                     >
                       {emailTestResult.success ? (
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
@@ -2982,11 +3285,10 @@ export default function AdminPage() {
 
                 {passwordChangeMessage && (
                   <div
-                    className={`flex items-center gap-1.5 p-2 rounded-lg text-xs font-semibold ${
-                      passwordChangeMessage.success
+                    className={`flex items-center gap-1.5 p-2 rounded-lg text-xs font-semibold ${passwordChangeMessage.success
                         ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
                         : 'bg-red-50 border border-red-200 text-red-700'
-                    }`}
+                      }`}
                   >
                     {passwordChangeMessage.success ? (
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -3029,6 +3331,464 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+
+      {/* ========================================================= */}
+      {/* MODAL 0: DEDICATED BUNDLE STUDIO MODAL */}
+      {/* ========================================================= */}
+      {isBundleStudioOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto p-3 sm:p-4 flex items-center justify-center">
+          <div
+            onClick={() => setIsBundleStudioOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs cursor-pointer"
+          />
+
+          <div className="relative w-full max-w-4xl bg-white border border-[#E6E6E3] rounded-2xl shadow-2xl z-10 my-6 flex flex-col max-h-[92vh] overflow-hidden">
+            {/* Header */}
+            <div className="p-5 border-b border-[#E6E6E3] flex items-center justify-between bg-gradient-to-r from-amber-500/5 via-yellow-500/5 to-transparent">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-white flex items-center justify-center shadow-xs">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-extrabold text-amber-600 uppercase tracking-wider bg-amber-100 px-2 py-0.5 rounded-full">
+                      {bundleStudioData.id ? 'BUNDLE ЗАСАХ' : 'ШИНЭ BUNDLE ҮҮСГЭХ'}
+                    </span>
+                    <span className="text-zinc-400 text-xs">•</span>
+                    <span className="text-xs text-zinc-500 font-medium">Bundle Studio</span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-[#141414] tracking-tight">
+                    {bundleStudioData.title || 'Шинэ багц бүтээгдэхүүн'}
+                  </h3>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsBundleStudioOpen(false)}
+                className="p-2 text-zinc-400 hover:text-black rounded-lg hover:bg-zinc-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSaveBundleStudio} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 text-xs">
+              {bundleStudioError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{bundleStudioError}</span>
+                </div>
+              )}
+
+              {/* SECTION 1: BUNDLE INFO */}
+              <div className="space-y-3 bg-[#FBFBFA] border border-[#E6E6E3] rounded-xl p-4">
+                <div className="text-[11px] font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-amber-600" />
+                  <span>1. Багцын нэр ба тайлбар</span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                      Багцын нэр (Title) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={bundleStudioData.title}
+                      onChange={(e) => setBundleStudioData({ ...bundleStudioData, title: e.target.value })}
+                      placeholder="Жишээ: ALL-IN-ONE SOUND FX & LUTS BUNDLE 2026"
+                      className="w-full px-3 py-2 rounded-lg border border-[#E6E6E3] bg-white text-zinc-900 font-semibold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                      Дэд гарчиг (Subtitle)
+                    </label>
+                    <input
+                      type="text"
+                      value={bundleStudioData.subtitle}
+                      onChange={(e) => setBundleStudioData({ ...bundleStudioData, subtitle: e.target.value })}
+                      placeholder="Бүх шилдэг багцуудын нэгдсэн цуглуулга"
+                      className="w-full px-3 py-2 rounded-lg border border-[#E6E6E3] bg-white text-zinc-900 focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                      Ангилал (Category)
+                    </label>
+                    <select
+                      value={bundleStudioData.category}
+                      onChange={(e) => setBundleStudioData({ ...bundleStudioData, category: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border border-[#E6E6E3] bg-white text-zinc-900 focus:outline-none focus:border-amber-500"
+                    >
+                      {(settings?.categories || DEFAULT_STORE_CATEGORIES).map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                      Онцлох бейж (Badge)
+                    </label>
+                    <input
+                      type="text"
+                      value={bundleStudioData.badge}
+                      onChange={(e) => setBundleStudioData({ ...bundleStudioData, badge: e.target.value })}
+                      placeholder="40% ХЭМНЭЛТ / BUNDLE"
+                      className="w-full px-3 py-2 rounded-lg border border-[#E6E6E3] bg-white text-zinc-900 font-bold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: SELECT ACTIVE PRODUCTS */}
+              <div className="space-y-3 bg-[#FBFBFA] border border-[#E6E6E3] rounded-xl p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[11px] font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Package className="w-3.5 h-3.5 text-amber-600" />
+                      <span>2. Active бүтээгдэхүүнүүдээс сонгох</span>
+                    </div>
+                    <p className="text-[11px] text-zinc-500 mt-0.5">
+                      Багцад орох бүтээгдэхүүнүүдээ чагтална уу. ({bundleStudioData.bundleProductIds.length} бүтээгдэхүүн сонгогдсон)
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={selectAllBundleStudioProducts}
+                      className="px-2.5 py-1 bg-white hover:bg-zinc-100 border border-[#E6E6E3] rounded-md text-[11px] font-bold text-zinc-800 transition-colors cursor-pointer"
+                    >
+                      ✓ Бүгдийг сонгох
+                    </button>
+                    <button
+                      type="button"
+                      onClick={clearAllBundleStudioProducts}
+                      className="px-2.5 py-1 bg-white hover:bg-zinc-100 border border-[#E6E6E3] rounded-md text-[11px] font-medium text-zinc-500 transition-colors cursor-pointer"
+                    >
+                      ✕ Цэвэрлэх
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search in products */}
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={bundleStudioSearch}
+                    onChange={(e) => setBundleStudioSearch(e.target.value)}
+                    placeholder="Бүтээгдэхүүний нэрээр хайх..."
+                    className="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[#E6E6E3] bg-white text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Products list grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto p-1 border border-zinc-200/80 rounded-lg bg-white">
+                  {(() => {
+                    const activeProds = products.filter((p) => {
+                      if (bundleStudioData.id && p.id === bundleStudioData.id) return false
+                      if (!bundleStudioData.id && p.isBundle) return false
+                      if (bundleStudioSearch.trim()) {
+                        const q = bundleStudioSearch.toLowerCase()
+                        return p.title.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)
+                      }
+                      return true
+                    })
+
+                    if (activeProds.length === 0) {
+                      return (
+                        <div className="col-span-full py-8 text-center text-zinc-400 text-xs">
+                          Идэвхтэй бүтээгдэхүүн олдсонгүй.
+                        </div>
+                      )
+                    }
+
+                    return activeProds.map((prod) => {
+                      const isSelected = bundleStudioData.bundleProductIds.includes(prod.id) || bundleStudioData.bundleProductIds.includes(prod.slug)
+                      return (
+                        <div
+                          key={prod.id}
+                          onClick={() => toggleBundleStudioProduct(prod.id)}
+                          className={`p-2 rounded-lg border cursor-pointer transition-all flex items-center justify-between gap-2.5 select-none ${
+                            isSelected
+                              ? 'bg-amber-500/10 border-amber-500 text-amber-950 font-medium'
+                              : 'bg-white border-[#E6E6E3] hover:border-zinc-300 text-zinc-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-4 h-4 rounded flex items-center justify-center shrink-0 border ${
+                              isSelected ? 'bg-amber-500 border-amber-500 text-white' : 'border-zinc-300 bg-white'
+                            }`}>
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+
+                            <div className="relative w-8 h-8 rounded bg-zinc-100 overflow-hidden shrink-0 border border-black/5">
+                              {prod.image ? (
+                                <img src={prod.image} alt={prod.title} className="w-full h-full object-cover" />
+                              ) : (
+                                <Package className="w-4 h-4 text-zinc-400 absolute inset-0 m-auto" />
+                              )}
+                            </div>
+
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold truncate max-w-[200px]">
+                                {prod.title}
+                              </div>
+                              <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono font-semibold text-zinc-800">
+                                  {Number(prod.priceMNT || 0).toLocaleString()}₮
+                                </span>
+                                {prod.fileSize && <span>· {prod.fileSize}</span>}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {prod.r2Key ? (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                ☁️ R2
+                              </span>
+                            ) : prod.defaultWeTransferLink ? (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                                ⚡ Drive
+                              </span>
+                            ) : (
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-400">
+                                Холбоосгүй
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+
+              {/* SECTION 3: PRICING & AUTO-DISCOUNT ENGINE */}
+              <div className="space-y-3 bg-[#FBFBFA] border border-[#E6E6E3] rounded-xl p-4">
+                <div className="text-[11px] font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                  <span>3. Үнэ & Хямдралын автомат тооцоо</span>
+                </div>
+
+                {/* Original Sum Display */}
+                <div className="p-3 bg-white border border-[#E6E6E3] rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">
+                      Сонгогдсон ({bundleStudioData.bundleProductIds.length}) бүтээгдэхүүний үндсэн нийлбэр үнэ
+                    </span>
+                    <div className="text-lg font-black font-mono text-zinc-900 mt-0.5">
+                      {Number(bundleStudioData.originalPriceMNT || 0).toLocaleString()}₮
+                      <span className="text-xs text-zinc-400 font-normal ml-2">
+                        (${Number(bundleStudioData.originalPriceUSD || 0).toFixed(2)})
+                      </span>
+                    </div>
+                  </div>
+
+                  {bundleStudioData.originalPriceMNT > bundleStudioData.priceMNT && (
+                    <div className="text-right">
+                      <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider block">
+                        Хэмнэлт
+                      </span>
+                      <div className="text-sm font-black font-mono text-emerald-600">
+                        -{(bundleStudioData.originalPriceMNT - bundleStudioData.priceMNT).toLocaleString()}₮ ({bundleStudioData.discountPercent}%)
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Discount % Selector */}
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-700 mb-1.5">
+                    Хямдралын хувь сонгох (%)
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[40, 50, 60, 70, 75, 80].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => applyBundleStudioDiscount(pct)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                          bundleStudioData.discountPercent === pct
+                            ? 'bg-amber-500 text-white shadow-xs scale-105'
+                            : 'bg-white border border-[#E6E6E3] text-zinc-700 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {pct}% Хямдрал
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1 bg-white border border-[#E6E6E3] rounded-lg px-2 py-1">
+                      <input
+                        type="number"
+                        min="1"
+                        max="99"
+                        value={bundleStudioData.discountPercent}
+                        onChange={(e) => applyBundleStudioDiscount(Number(e.target.value))}
+                        className="w-12 text-center text-xs font-bold text-zinc-900 focus:outline-none"
+                      />
+                      <span className="text-zinc-500 text-xs font-bold">%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Final Prices */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[#E6E6E3]">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                      Багцын зарах үнэ (MNT ₮) *
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={bundleStudioData.priceMNT}
+                      onChange={(e) => {
+                        const val = Number(e.target.value)
+                        const rate = exchangeRate > 0 ? exchangeRate : 3600
+                        setBundleStudioData({
+                          ...bundleStudioData,
+                          priceMNT: val,
+                          priceUSD: Number((val / rate).toFixed(2)),
+                        })
+                      }}
+                      className="w-full px-3 py-2 rounded-lg border border-[#E6E6E3] bg-white text-zinc-900 font-mono font-bold text-sm focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-700 mb-1">
+                      Багцын зарах үнэ (USD $) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={bundleStudioData.priceUSD}
+                      onChange={(e) => setBundleStudioData({ ...bundleStudioData, priceUSD: Number(e.target.value) })}
+                      className="w-full px-3 py-2 rounded-lg border border-[#E6E6E3] bg-white text-zinc-900 font-mono font-bold text-sm focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 4: COVER IMAGE */}
+              <div className="space-y-3 bg-[#FBFBFA] border border-[#E6E6E3] rounded-xl p-4">
+                <div className="text-[11px] font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-amber-600" />
+                  <span>4. Багцын ковер зураг</span>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-zinc-200 border border-[#E6E6E3] shrink-0">
+                    {bundleStudioData.image ? (
+                      <img src={bundleStudioData.image} alt="Bundle cover" className="w-full h-full object-cover" />
+                    ) : (
+                      <Package className="w-8 h-8 text-zinc-400 absolute inset-0 m-auto" />
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      value={bundleStudioData.image}
+                      onChange={(e) => setBundleStudioData({ ...bundleStudioData, image: e.target.value })}
+                      placeholder="Зургийн URL зам (Жишээ: /images/product-trending.png)"
+                      className="w-full px-3 py-1.5 rounded-lg border border-[#E6E6E3] bg-white text-xs text-zinc-900 font-mono focus:outline-none focus:border-amber-500"
+                    />
+                    
+                    {/* Quick pick from selected products */}
+                    <div>
+                      <span className="text-[10px] text-zinc-500 block mb-1">
+                        Сонгогдсон бүтээгдэхүүний зургаас 1 товшилтоор сонгох:
+                      </span>
+                      <div className="flex items-center gap-1.5 overflow-x-auto py-1">
+                        {products
+                          .filter((p) => bundleStudioData.bundleProductIds.includes(p.id) || bundleStudioData.bundleProductIds.includes(p.slug))
+                          .slice(0, 8)
+                          .map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => setBundleStudioData({ ...bundleStudioData, image: p.image })}
+                              className={`relative w-8 h-8 rounded border overflow-hidden shrink-0 cursor-pointer transition-all ${
+                                bundleStudioData.image === p.image ? 'ring-2 ring-amber-500 border-transparent scale-105' : 'border-zinc-200 hover:border-zinc-400 opacity-70 hover:opacity-100'
+                              }`}
+                              title={p.title}
+                            >
+                              <img src={p.image} alt={p.title} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 5: AUTOMATIC DOWNLOAD RESOLUTION CALLOUT */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 text-emerald-950">
+                <div className="flex items-center gap-2 font-extrabold text-xs text-emerald-900">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Cloudflare руу шинэ файл оруулах шаардлагагүй! (Автомат горим)</span>
+                </div>
+                <p className="text-[11px] text-emerald-800 leading-relaxed">
+                  Энэхүү багцад сонгогдсон <strong>{bundleStudioData.bundleProductIds.length}</strong> бүтээгдэхүүн бүр өөрийн гэсэн Cloudflare R2 файл болон WeTransfer/Drive холбоостой тул хэрэглэгч энэхүү Bundle-ийг худалдан авмагц тухайн бүх бүтээгдэхүүний татах холбоос захиалгын хуудас болон и-мэйлээр <strong>АВТОМАТААР БҮРЭН НЭЭГДЭНЭ</strong>.
+                </p>
+
+                {/* Optional Master Archive Link */}
+                <div className="pt-2 border-t border-emerald-200/60 mt-2">
+                  <label className="block text-[10px] font-bold text-emerald-900 mb-1 uppercase tracking-wider">
+                    (Нэмэлт / Заавал биш) Нэгдсэн нөөц WeTransfer холбоос:
+                  </label>
+                  <input
+                    type="url"
+                    value={bundleStudioData.defaultWeTransferLink}
+                    onChange={(e) => setBundleStudioData({ ...bundleStudioData, defaultWeTransferLink: e.target.value })}
+                    placeholder="https://we.tl/t-... эсвэл Google Drive холбоос (байхгүй бол хоосон үлдээж болно)"
+                    className="w-full px-3 py-1.5 rounded-lg border border-emerald-300/80 bg-white text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="pt-3 border-t border-[#E6E6E3] flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setIsBundleStudioOpen(false)}
+                  className="py-2.5 px-4 rounded-xl border border-[#E6E6E3] bg-white hover:bg-zinc-50 text-zinc-700 font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Цуцлах
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={savingBundle}
+                  className="py-2.5 px-6 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-600 hover:from-amber-600 hover:to-amber-700 text-white font-extrabold text-xs transition-all shadow-md hover:shadow-lg cursor-pointer flex items-center gap-2 disabled:opacity-50"
+                >
+                  {savingBundle ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Хадгалж байна...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Layers className="w-4 h-4" />
+                      <span>{bundleStudioData.id ? 'BUNDLE ШИНЭЧЛЭХ' : 'BUNDLE ҮҮСГЭХ'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* MODAL 1: ADD / EDIT PRODUCT */}
@@ -3131,18 +3891,16 @@ export default function AdminPage() {
               </div>
 
               {/* Free Product Toggle Banner */}
-              <div className={`p-3 rounded-xl border transition-all ${
-                editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+              <div className={`p-3 rounded-xl border transition-all ${editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
                   ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20'
                   : 'bg-[#FAFAFA] border-[#E6E6E3]'
-              }`}>
+                }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
                         ? 'bg-emerald-600 text-white'
                         : 'bg-zinc-200 text-zinc-600'
-                    }`}>
+                      }`}>
                       <Gift className="w-4 h-4" />
                     </div>
                     <div>
@@ -3189,11 +3947,10 @@ export default function AdminPage() {
                         })
                       }
                     }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                      editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 ${editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
                         ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
                         : 'bg-white hover:bg-zinc-100 border border-zinc-300 text-zinc-700'
-                    }`}
+                      }`}
                   >
                     {editingProduct.isFree || (editingProduct.priceMNT === 0 && editingProduct.priceUSD === 0)
                       ? '✓ Үнэгүй болгосон'
@@ -3209,7 +3966,7 @@ export default function AdminPage() {
                     const baseCats = (settings.categories && settings.categories.length > 0)
                       ? [...settings.categories]
                       : [...DEFAULT_STORE_CATEGORIES]
-                    
+
                     const currentCatVal = (editingProduct.category || 'sfx').trim()
                     const found = baseCats.find((c) => c.id.toLowerCase() === currentCatVal.toLowerCase())
                     const selectOptions = found
@@ -3469,8 +4226,8 @@ export default function AdminPage() {
                       {deliveryTypeInModal === 'drive'
                         ? '📁 Зөвхөн Google Drive / Линк харагдана'
                         : deliveryTypeInModal === 'r2'
-                        ? '☁️ Зөвхөн Cloudflare R2 товч харагдана'
-                        : '🔗 R2 болон Drive 2-уулаа харагдана'}
+                          ? '☁️ Зөвхөн Cloudflare R2 товч харагдана'
+                          : '🔗 R2 болон Drive 2-уулаа харагдана'}
                     </span>
                   </div>
 
@@ -3481,11 +4238,10 @@ export default function AdminPage() {
                         setDeliveryTypeInModal('drive')
                         setShowR2InModal(false)
                       }}
-                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
-                        deliveryTypeInModal === 'drive'
+                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${deliveryTypeInModal === 'drive'
                           ? 'bg-white text-[#0088CC] shadow-xs font-bold border border-zinc-200'
                           : 'text-zinc-600 hover:text-black hover:bg-white/50'
-                      }`}
+                        }`}
                     >
                       <ExternalLink className="w-3.5 h-3.5 shrink-0" />
                       <span className="truncate">Google Drive / Линк</span>
@@ -3497,11 +4253,10 @@ export default function AdminPage() {
                         setDeliveryTypeInModal('r2')
                         setShowR2InModal(true)
                       }}
-                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
-                        deliveryTypeInModal === 'r2'
+                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${deliveryTypeInModal === 'r2'
                           ? 'bg-white text-purple-600 shadow-xs font-bold border border-zinc-200'
                           : 'text-zinc-600 hover:text-black hover:bg-white/50'
-                      }`}
+                        }`}
                     >
                       <Cloud className="w-3.5 h-3.5 shrink-0" />
                       <span className="truncate">Cloudflare R2</span>
@@ -3513,11 +4268,10 @@ export default function AdminPage() {
                         setDeliveryTypeInModal('both')
                         setShowR2InModal(true)
                       }}
-                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${
-                        deliveryTypeInModal === 'both'
+                      className={`py-2 px-2.5 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center ${deliveryTypeInModal === 'both'
                           ? 'bg-white text-emerald-600 shadow-xs font-bold border border-zinc-200'
                           : 'text-zinc-600 hover:text-black hover:bg-white/50'
-                      }`}
+                        }`}
                     >
                       <Sparkles className="w-3.5 h-3.5 shrink-0 text-amber-500" />
                       <span className="truncate">Хоёулаа (R2+Drive)</span>
@@ -3656,8 +4410,8 @@ export default function AdminPage() {
                         {editingProduct.sampleVideoUrl.includes('youtube') || editingProduct.sampleVideoUrl.includes('youtu.be')
                           ? 'YouTube Видео (Embed)'
                           : editingProduct.sampleVideoUrl.includes('vimeo')
-                          ? 'Vimeo Видео'
-                          : 'Шууд видео (.mp4/веб)'}
+                            ? 'Vimeo Видео'
+                            : 'Шууд видео (.mp4/веб)'}
                       </span>
                     </div>
                     <a
@@ -3692,18 +4446,17 @@ export default function AdminPage() {
 
                 {/* Upload Button & Drop Zone */}
                 <div className="flex flex-col sm:flex-row items-center gap-2">
-                  <label className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 border-dashed transition-all cursor-pointer text-xs font-semibold ${
-                    (editingProduct.images?.length || 0) >= 6
+                  <label className={`w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border-2 border-dashed transition-all cursor-pointer text-xs font-semibold ${(editingProduct.images?.length || 0) >= 6
                       ? 'border-zinc-200 bg-zinc-100 text-zinc-400 cursor-not-allowed'
                       : 'border-blue-300 hover:border-blue-500 bg-blue-50/50 hover:bg-blue-50 text-[#0088CC]'
-                  }`}>
+                    }`}>
                     <Upload className="w-4 h-4 shrink-0" />
                     <span>
                       {uploadingProductImages
                         ? uploadProgressText || 'Зургийг хуулж байна...'
                         : (editingProduct.images?.length || 0) >= 6
-                        ? 'Зургийн дээд хязгаар (6/6) дүүрсэн'
-                        : '+ Зураг оруулах (PNG / JPG / WEBP / GIF хөдөлгөөнт зураг)'}
+                          ? 'Зургийн дээд хязгаар (6/6) дүүрсэн'
+                          : '+ Зураг оруулах (PNG / JPG / WEBP / GIF хөдөлгөөнт зураг)'}
                     </span>
                     <input
                       type="file"
@@ -3733,11 +4486,10 @@ export default function AdminPage() {
                         return (
                           <div
                             key={idx}
-                            className={`relative group rounded-lg overflow-hidden border-2 bg-white flex flex-col justify-between ${
-                              idx === 0
+                            className={`relative group rounded-lg overflow-hidden border-2 bg-white flex flex-col justify-between ${idx === 0
                                 ? 'border-[#0088CC] ring-2 ring-[#0088CC]/20 shadow-xs'
                                 : 'border-zinc-200 hover:border-zinc-400'
-                            }`}
+                              }`}
                           >
                             <div className="relative aspect-square w-full bg-zinc-100">
                               <SafeProductImage
@@ -3763,56 +4515,56 @@ export default function AdminPage() {
                               </div>
                             </div>
 
-                          {/* Quick Controls */}
-                          <div className="p-1 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between text-[10px]">
-                            {idx > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => handleSetPrimaryImage(idx)}
-                                className="text-zinc-600 hover:text-[#0088CC] font-semibold text-[9px] hover:underline"
-                                title="Үндсэн нүүр зураг болгох"
-                              >
-                                Үндсэн
-                              </button>
-                            ) : (
-                              <span className="text-[9px] text-zinc-400 font-mono">Нүүр</span>
-                            )}
+                            {/* Quick Controls */}
+                            <div className="p-1 bg-zinc-50 border-t border-zinc-100 flex items-center justify-between text-[10px]">
+                              {idx > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetPrimaryImage(idx)}
+                                  className="text-zinc-600 hover:text-[#0088CC] font-semibold text-[9px] hover:underline"
+                                  title="Үндсэн нүүр зураг болгох"
+                                >
+                                  Үндсэн
+                                </button>
+                              ) : (
+                                <span className="text-[9px] text-zinc-400 font-mono">Нүүр</span>
+                              )}
 
-                            <div className="flex items-center gap-0.5">
-                              {idx > 0 && (
+                              <div className="flex items-center gap-0.5">
+                                {idx > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveProductImage(idx, 'left')}
+                                    className="p-1 text-zinc-400 hover:text-black rounded hover:bg-zinc-200"
+                                    title="Зүүн тийш зөөх"
+                                  >
+                                    <ChevronLeftIcon className="w-3 h-3" />
+                                  </button>
+                                )}
+                                {idx < editingProduct.images!.length - 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveProductImage(idx, 'right')}
+                                    className="p-1 text-zinc-400 hover:text-black rounded hover:bg-zinc-200"
+                                    title="Баруун тийш зөөх"
+                                  >
+                                    <ChevronRightIcon className="w-3 h-3" />
+                                  </button>
+                                )}
                                 <button
                                   type="button"
-                                  onClick={() => handleMoveProductImage(idx, 'left')}
-                                  className="p-1 text-zinc-400 hover:text-black rounded hover:bg-zinc-200"
-                                  title="Зүүн тийш зөөх"
+                                  onClick={() => handleRemoveProductImage(idx)}
+                                  className="p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-50 ml-0.5"
+                                  title="Устгах"
                                 >
-                                  <ChevronLeftIcon className="w-3 h-3" />
+                                  <Trash2 className="w-3 h-3" />
                                 </button>
-                              )}
-                              {idx < editingProduct.images!.length - 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleMoveProductImage(idx, 'right')}
-                                  className="p-1 text-zinc-400 hover:text-black rounded hover:bg-zinc-200"
-                                  title="Баруун тийш зөөх"
-                                >
-                                  <ChevronRightIcon className="w-3 h-3" />
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveProductImage(idx)}
-                                className="p-1 text-red-500 hover:text-red-700 rounded hover:bg-red-50 ml-0.5"
-                                title="Устгах"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                        )
+                      })}
+                    </div>
 
                     {/* Live Collage Preview */}
                     <div className="mt-3 p-3 bg-white rounded-xl border border-zinc-200">
@@ -3831,8 +4583,8 @@ export default function AdminPage() {
                       <div className="max-w-md mx-auto aspect-[16/10] rounded-lg overflow-hidden border border-zinc-200">
                         {renderCollageGrid(
                           editingProduct.images,
-                          () => {},
-                          () => {}
+                          () => { },
+                          () => { }
                         )}
                       </div>
                     </div>
@@ -3965,16 +4717,14 @@ export default function AdminPage() {
               {/* ========================================================= */}
               {/* BUNDLE CREATOR & PRODUCT MERGER STUDIO */}
               {/* ========================================================= */}
-              <div className={`p-3.5 rounded-xl border transition-all ${
-                editingProduct.isBundle
+              <div className={`p-3.5 rounded-xl border transition-all ${editingProduct.isBundle
                   ? 'bg-gradient-to-b from-amber-50/70 to-orange-50/40 border-amber-300 ring-2 ring-amber-500/20'
                   : 'bg-[#FAFAFA] border-[#E6E6E3]'
-              }`}>
+                }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                      editingProduct.isBundle ? 'bg-amber-500 text-white shadow-xs' : 'bg-zinc-200 text-zinc-600'
-                    }`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${editingProduct.isBundle ? 'bg-amber-500 text-white shadow-xs' : 'bg-zinc-200 text-zinc-600'
+                      }`}>
                       <Package className="w-4 h-4" />
                     </div>
                     <div>
@@ -4073,15 +4823,14 @@ export default function AdminPage() {
                               <div
                                 key={p.id}
                                 onClick={() => toggleBundleProduct(p.id)}
-                                className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
-                                  isSelected ? 'bg-amber-50/90 border border-amber-300/80' : 'hover:bg-zinc-50'
-                                }`}
+                                className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${isSelected ? 'bg-amber-50/90 border border-amber-300/80' : 'hover:bg-zinc-50'
+                                  }`}
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
-                                    onChange={() => {}}
+                                    onChange={() => { }}
                                     className="w-3.5 h-3.5 text-amber-600 rounded cursor-pointer shrink-0"
                                   />
                                   <div className="w-7 h-7 rounded bg-zinc-100 overflow-hidden relative shrink-0">
@@ -4183,11 +4932,10 @@ export default function AdminPage() {
                               key={pct}
                               type="button"
                               onClick={() => applyBundleDiscountPercent(pct)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                                editingProduct.discountPercent === pct
+                              className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${editingProduct.discountPercent === pct
                                   ? 'bg-amber-600 text-white shadow-xs'
                                   : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-200'
-                              }`}
+                                }`}
                             >
                               {pct}% Хямдрал
                             </button>
@@ -4208,50 +4956,50 @@ export default function AdminPage() {
                           </div>
                         </div>
                       </div>
+                    </div>
 
-                      {/* Summary result badge */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 bg-amber-50/50 rounded-lg border border-amber-200/60 text-xs">
-                        <div>
-                          <span className="text-[10px] text-zinc-500 block">Үндсэн үнэ (Хуучин):</span>
-                          <span className="font-mono font-bold text-zinc-800 line-through">
-                            {(Number(editingProduct.originalPriceMNT) || 0).toLocaleString()}₮
-                          </span>{' '}
-                          <span className="font-mono text-[10px] text-zinc-400">
-                            (${Number(editingProduct.originalPriceUSD || 0).toFixed(2)})
-                          </span>
-                        </div>
-
-                        <div>
-                          <span className="text-[10px] text-zinc-500 block">Хямдарсан үнэ (Авах):</span>
-                          <span className="font-mono font-black text-emerald-700 text-sm">
-                            {(Number(editingProduct.priceMNT) || 0).toLocaleString()}₮
-                          </span>{' '}
-                          <span className="font-mono text-[10px] text-emerald-600 font-bold">
-                            (${Number(editingProduct.priceUSD || 0).toFixed(2)})
-                          </span>
-                        </div>
-
-                        <div>
-                          <span className="text-[10px] text-zinc-500 block">Хэмнэлт & Бейж:</span>
-                          <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded text-[11px] border border-amber-200">
-                            {editingProduct.discountPercent
-                              ? `${editingProduct.discountPercent}% ХЭМНЭЛТ`
-                              : `${editingProduct.badge || 'BUNDLE'}`}
-                          </span>
-                        </div>
+                    {/* Summary result badge */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-2.5 bg-amber-50/50 rounded-lg border border-amber-200/60 text-xs">
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block">Үндсэн үнэ (Хуучин):</span>
+                        <span className="font-mono font-bold text-zinc-800 line-through">
+                          {(Number(editingProduct.originalPriceMNT) || 0).toLocaleString()}₮
+                        </span>{' '}
+                        <span className="font-mono text-[10px] text-zinc-400">
+                          (${Number(editingProduct.originalPriceUSD || 0).toFixed(2)})
+                        </span>
                       </div>
 
-                      {/* Auto-populate features button */}
-                      <div className="pt-1 flex items-center justify-between">
-                        <button
-                          type="button"
-                          onClick={autoPopulateBundleFeatures}
-                          className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5"
-                        >
-                          <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Сонгосон бүтээгдэхүүнүүдийг онцлог (Features) руу автоматаар хуулах</span>
-                        </button>
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block">Хямдарсан үнэ (Авах):</span>
+                        <span className="font-mono font-black text-emerald-700 text-sm">
+                          {(Number(editingProduct.priceMNT) || 0).toLocaleString()}₮
+                        </span>{' '}
+                        <span className="font-mono text-[10px] text-emerald-600 font-bold">
+                          (${Number(editingProduct.priceUSD || 0).toFixed(2)})
+                        </span>
                       </div>
+
+                      <div>
+                        <span className="text-[10px] text-zinc-500 block">Хэмнэлт & Бейж:</span>
+                        <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                          {editingProduct.discountPercent
+                            ? `${editingProduct.discountPercent}% ХЭМНЭЛТ`
+                            : `${editingProduct.badge || 'BUNDLE'}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Auto-populate features button */}
+                    <div className="pt-1 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={autoPopulateBundleFeatures}
+                        className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Сонгосон бүтээгдэхүүнүүдийг онцлог (Features) руу автоматаар хуулах</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -4279,294 +5027,297 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 2: APPROVE ORDER WITH WETRANSFER */}
-      {/* ========================================================= */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-50 overflow-y-auto p-4 flex items-center justify-center">
-          <div
-            onClick={() => setSelectedOrder(null)}
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs cursor-pointer"
-          />
+{/* ========================================================= */ }
+{/* MODAL 2: APPROVE ORDER WITH WETRANSFER */ }
+{/* ========================================================= */ }
+{
+  selectedOrder && (
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4 flex items-center justify-center">
+      <div
+        onClick={() => setSelectedOrder(null)}
+        className="fixed inset-0 bg-black/40 backdrop-blur-xs cursor-pointer"
+      />
 
-          <div className="relative w-full max-w-lg bg-white border border-[#E6E6E3] rounded-2xl p-6 shadow-xl z-10">
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-black rounded-lg hover:bg-zinc-100 cursor-pointer"
+      <div className="relative w-full max-w-lg bg-white border border-[#E6E6E3] rounded-2xl p-6 shadow-xl z-10">
+        <button
+          onClick={() => setSelectedOrder(null)}
+          className="absolute top-4 right-4 p-1.5 text-zinc-400 hover:text-black rounded-lg hover:bg-zinc-100 cursor-pointer"
+        >
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="mb-4">
+          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">
+            ЗАХИАЛГА БАТАЛГААЖУУЛАЛТ
+          </span>
+          <h3 className="text-base font-bold text-[#141414]">
+            Google Drive эрх олгох ба Татах холбоос
+          </h3>
+        </div>
+
+        <div className="bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-3 mb-4 text-xs space-y-1.5">
+          <div>
+            <span className="text-zinc-500">Захиалга: </span>
+            <span className="font-mono font-bold text-zinc-900">{selectedOrder.id}</span>
+          </div>
+          <div>
+            <span className="text-zinc-500">Захиалагч: </span>
+            <span className="font-bold text-zinc-900">{selectedOrder.customerName}</span> ({selectedOrder.customerPhone || 'Утасгүй'})
+          </div>
+          <div>
+            <span className="text-zinc-500">Багц: </span>
+            <span className="font-semibold text-zinc-800">{selectedOrder.items.map((i) => i.title).join(', ')}</span>
+          </div>
+          <div>
+            <span className="text-zinc-500">Төлсөн дүн: </span>
+            <span className="font-mono font-bold text-emerald-700">{selectedOrder.totalAmountMNT.toLocaleString()}₮</span>
+          </div>
+
+          {/* Customer Gmail for Google Drive Access */}
+          <div className="pt-2 border-t border-[#E6E6E3] flex flex-wrap items-center justify-between gap-2 bg-blue-50/60 -mx-3 -mb-3 p-3 rounded-b-xl">
+            <div>
+              <span className="text-[10px] uppercase font-bold text-blue-900 block">
+                Google Drive эрх нээх Gmail:
+              </span>
+              <span className="font-mono font-bold text-sm text-blue-950 select-all">
+                {selectedOrder.customerEmail}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(selectedOrder.customerEmail)
+                  setCopiedGmail(true)
+                  setTimeout(() => setCopiedGmail(false), 2000)
+                }}
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-800 shadow-2xs cursor-pointer transition-colors"
+              >
+                {copiedGmail ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-700 font-bold">Хуулагдлаа!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3.5 h-3.5 text-zinc-600" />
+                    <span>Gmail хуулах</span>
+                  </>
+                )}
+              </button>
+              <a
+                href="https://drive.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Drive нээх</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 text-xs mb-4">
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
+              <Cloud className="w-3.5 h-3.5 text-[#0088CC]" />
+              <span>Cloudflare R2 Key (Өндөр хурдны шууд таталт - Сонголтоор)</span>
+            </label>
+            <input
+              type="text"
+              value={orderR2KeyInput}
+              onChange={(e) => setOrderR2KeyInput(e.target.value)}
+              placeholder="Жишээ: sfx/cinematic-braams-risers.zip"
+              className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
+            />
+            <p className="text-[10px] text-zinc-400 mt-0.5">
+              R2 түлхүүр оруулбал хэрэглэгч захиалгын хуудсаасаа шууд 1GB-10GB+ файлаа дээд хурдаар татна.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+              Google Drive / Татах холбоос (Хэрэглэгчид очих линк) *
+            </label>
+            <input
+              type="url"
+              value={weTransferInput}
+              onChange={(e) => setWeTransferInput(e.target.value)}
+              placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
+              className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
+            />
+            <p className="text-[10px] text-zinc-500 mt-1">
+              💡 Google Drive дээр дээрх хэрэглэгчийн Gmail-д Share хийж хандах эрх нээгээд, фолдер эсвэл файлын холбоосоо энд хуулж тавина уу.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+              Админы тэмдэглэл
+            </label>
+            <input
+              type="text"
+              value={adminNotesInput}
+              onChange={(e) => setAdminNotesInput(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
+            />
+          </div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 mb-4">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={sendEmailToggle}
+              onChange={(e) => setSendEmailToggle(e.target.checked)}
+              className="mt-0.5 rounded border-blue-300 text-[#0088CC] focus:ring-[#00B0FF]"
+            />
+            <div className="text-xs">
+              <div className="font-bold text-blue-900 flex items-center gap-1.5">
+                <Mail className="w-3.5 h-3.5 text-[#0088CC]" />
+                <span>Татах холбоосыг хэрэглэгчийн Gmail рүү илгээх</span>
+              </div>
+              <div className="text-blue-700 text-[11px] mt-0.5">
+                Хүлээн авагч: <span className="font-mono font-semibold">{selectedOrder.customerEmail}</span>
+              </div>
+            </div>
+          </label>
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-[#E6E6E3] pt-3">
+          <button
+            onClick={() => setSelectedOrder(null)}
+            className="py-2 px-4 rounded-full border border-[#E6E6E3] bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-semibold cursor-pointer"
+          >
+            Болих
+          </button>
+
+          <button
+            onClick={handleApproveOrder}
+            disabled={approving || (!weTransferInput.trim() && !orderR2KeyInput.trim())}
+            className="py-2 px-5 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5"
+          >
+            <Check className="w-3.5 h-3.5" />
+            <span>{approving ? 'Баталгаажуулж байна...' : 'Баталгаажуулж Линк Олгох'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+{/* ========================================================= */ }
+{/* MODAL 3: CHANGE ADMIN PASSWORD MODAL */ }
+{/* ========================================================= */ }
+{
+  isPasswordModalOpen && (
+    <div className="fixed inset-0 z-50 overflow-y-auto p-4 flex items-center justify-center">
+      <div
+        className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+        onClick={() => setIsPasswordModalOpen(false)}
+      />
+
+      <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl border border-[#E6E6E3] p-5 sm:p-6 z-10">
+        <div className="flex items-center justify-between pb-3 border-b border-[#E6E6E3] mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <KeyRound className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-zinc-900">Админ нууц үг солих</h3>
+              <p className="text-[11px] text-zinc-500">Системд нэвтрэх шинэ нууц үг тохируулах</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsPasswordModalOpen(false)}
+            className="p-1 rounded-lg text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={handlePasswordChange} className="space-y-3.5">
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+              Одоогийн нууц үг
+            </label>
+            <input
+              type="password"
+              value={currentPasswordInput}
+              onChange={(e) => setCurrentPasswordInput(e.target.value)}
+              placeholder="Одоогийн нууц үгээ оруулна уу"
+              className="w-full px-3 py-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+              Шинэ нууц үг (дор хаяж 6 тэмдэгт)
+            </label>
+            <input
+              type="password"
+              value={newPasswordInput}
+              onChange={(e) => setNewPasswordInput(e.target.value)}
+              placeholder="Шинэ хүчтэй нууц үг"
+              className="w-full px-3 py-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
+              Шинэ нууц үг баталгаажуулах
+            </label>
+            <input
+              type="password"
+              value={confirmPasswordInput}
+              onChange={(e) => setConfirmPasswordInput(e.target.value)}
+              placeholder="Шинэ нууц үгээ дахин оруулна уу"
+              className="w-full px-3 py-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
+            />
+          </div>
+
+          {passwordChangeMessage && (
+            <div
+              className={`flex items-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold ${passwordChangeMessage.success
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+                }`}
             >
-              <X className="w-4 h-4" />
+              {passwordChangeMessage.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
+              )}
+              <span>{passwordChangeMessage.text}</span>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E6E6E3]">
+            <button
+              type="button"
+              onClick={() => setIsPasswordModalOpen(false)}
+              className="py-2 px-4 rounded-full border border-[#E6E6E3] bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-semibold cursor-pointer"
+            >
+              Хаах
             </button>
 
-            <div className="mb-4">
-              <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">
-                ЗАХИАЛГА БАТАЛГААЖУУЛАЛТ
-              </span>
-              <h3 className="text-base font-bold text-[#141414]">
-                Google Drive эрх олгох ба Татах холбоос
-              </h3>
-            </div>
-
-            <div className="bg-[#F7F7F5] border border-[#E6E6E3] rounded-xl p-3 mb-4 text-xs space-y-1.5">
-              <div>
-                <span className="text-zinc-500">Захиалга: </span>
-                <span className="font-mono font-bold text-zinc-900">{selectedOrder.id}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500">Захиалагч: </span>
-                <span className="font-bold text-zinc-900">{selectedOrder.customerName}</span> ({selectedOrder.customerPhone || 'Утасгүй'})
-              </div>
-              <div>
-                <span className="text-zinc-500">Багц: </span>
-                <span className="font-semibold text-zinc-800">{selectedOrder.items.map((i) => i.title).join(', ')}</span>
-              </div>
-              <div>
-                <span className="text-zinc-500">Төлсөн дүн: </span>
-                <span className="font-mono font-bold text-emerald-700">{selectedOrder.totalAmountMNT.toLocaleString()}₮</span>
-              </div>
-
-              {/* Customer Gmail for Google Drive Access */}
-              <div className="pt-2 border-t border-[#E6E6E3] flex flex-wrap items-center justify-between gap-2 bg-blue-50/60 -mx-3 -mb-3 p-3 rounded-b-xl">
-                <div>
-                  <span className="text-[10px] uppercase font-bold text-blue-900 block">
-                    Google Drive эрх нээх Gmail:
-                  </span>
-                  <span className="font-mono font-bold text-sm text-blue-950 select-all">
-                    {selectedOrder.customerEmail}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(selectedOrder.customerEmail)
-                      setCopiedGmail(true)
-                      setTimeout(() => setCopiedGmail(false), 2000)
-                    }}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-white hover:bg-zinc-50 border border-zinc-300 text-zinc-800 shadow-2xs cursor-pointer transition-colors"
-                  >
-                    {copiedGmail ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-700 font-bold">Хуулагдлаа!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-zinc-600" />
-                        <span>Gmail хуулах</span>
-                      </>
-                    )}
-                  </button>
-                  <a
-                    href="https://drive.google.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-colors"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>Drive нээх</span>
-                  </a>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 text-xs mb-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1 flex items-center gap-1.5">
-                  <Cloud className="w-3.5 h-3.5 text-[#0088CC]" />
-                  <span>Cloudflare R2 Key (Өндөр хурдны шууд таталт - Сонголтоор)</span>
-                </label>
-                <input
-                  type="text"
-                  value={orderR2KeyInput}
-                  onChange={(e) => setOrderR2KeyInput(e.target.value)}
-                  placeholder="Жишээ: sfx/cinematic-braams-risers.zip"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900"
-                />
-                <p className="text-[10px] text-zinc-400 mt-0.5">
-                  R2 түлхүүр оруулбал хэрэглэгч захиалгын хуудсаасаа шууд 1GB-10GB+ файлаа дээд хурдаар татна.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Google Drive / Татах холбоос (Хэрэглэгчид очих линк) *
-                </label>
-                <input
-                  type="url"
-                  value={weTransferInput}
-                  onChange={(e) => setWeTransferInput(e.target.value)}
-                  placeholder="https://drive.google.com/drive/folders/... эсвэл WeTransfer линк"
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] font-mono text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
-                />
-                <p className="text-[10px] text-zinc-500 mt-1">
-                  💡 Google Drive дээр дээрх хэрэглэгчийн Gmail-д Share хийж хандах эрх нээгээд, фолдер эсвэл файлын холбоосоо энд хуулж тавина уу.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Админы тэмдэглэл
-                </label>
-                <input
-                  type="text"
-                  value={adminNotesInput}
-                  onChange={(e) => setAdminNotesInput(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-white border border-[#E6E6E3] text-xs text-zinc-900"
-                />
-              </div>
-            </div>
-
-            <div className="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 mb-4">
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sendEmailToggle}
-                  onChange={(e) => setSendEmailToggle(e.target.checked)}
-                  className="mt-0.5 rounded border-blue-300 text-[#0088CC] focus:ring-[#00B0FF]"
-                />
-                <div className="text-xs">
-                  <div className="font-bold text-blue-900 flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-[#0088CC]" />
-                    <span>Татах холбоосыг хэрэглэгчийн Gmail рүү илгээх</span>
-                  </div>
-                  <div className="text-blue-700 text-[11px] mt-0.5">
-                    Хүлээн авагч: <span className="font-mono font-semibold">{selectedOrder.customerEmail}</span>
-                  </div>
-                </div>
-              </label>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-[#E6E6E3] pt-3">
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="py-2 px-4 rounded-full border border-[#E6E6E3] bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-semibold cursor-pointer"
-              >
-                Болих
-              </button>
-
-              <button
-                onClick={handleApproveOrder}
-                disabled={approving || (!weTransferInput.trim() && !orderR2KeyInput.trim())}
-                className="py-2 px-5 rounded-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>{approving ? 'Баталгаажуулж байна...' : 'Баталгаажуулж Линк Олгох'}</span>
-              </button>
-            </div>
+            <button
+              type="submit"
+              disabled={passwordChangeLoading || !currentPasswordInput || !newPasswordInput}
+              className="py-2 px-5 rounded-full bg-[#141414] hover:bg-black disabled:opacity-50 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+              <span>{passwordChangeLoading ? 'Шинэчилж байна...' : 'Нууц үг хадгалах'}</span>
+            </button>
           </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
-      {/* MODAL 3: CHANGE ADMIN PASSWORD MODAL */}
-      {/* ========================================================= */}
-      {isPasswordModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto p-4 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsPasswordModalOpen(false)}
-          />
-
-          <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl border border-[#E6E6E3] p-5 sm:p-6 z-10">
-            <div className="flex items-center justify-between pb-3 border-b border-[#E6E6E3] mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <KeyRound className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-zinc-900">Админ нууц үг солих</h3>
-                  <p className="text-[11px] text-zinc-500">Системд нэвтрэх шинэ нууц үг тохируулах</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsPasswordModalOpen(false)}
-                className="p-1 rounded-lg text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handlePasswordChange} className="space-y-3.5">
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Одоогийн нууц үг
-                </label>
-                <input
-                  type="password"
-                  value={currentPasswordInput}
-                  onChange={(e) => setCurrentPasswordInput(e.target.value)}
-                  placeholder="Одоогийн нууц үгээ оруулна уу"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
-                  autoFocus
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Шинэ нууц үг (дор хаяж 6 тэмдэгт)
-                </label>
-                <input
-                  type="password"
-                  value={newPasswordInput}
-                  onChange={(e) => setNewPasswordInput(e.target.value)}
-                  placeholder="Шинэ хүчтэй нууц үг"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-zinc-700 mb-1">
-                  Шинэ нууц үг баталгаажуулах
-                </label>
-                <input
-                  type="password"
-                  value={confirmPasswordInput}
-                  onChange={(e) => setConfirmPasswordInput(e.target.value)}
-                  placeholder="Шинэ нууц үгээ дахин оруулна уу"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAFAFA] border border-[#E6E6E3] text-xs text-zinc-900 focus:outline-none focus:border-[#00B0FF]"
-                />
-              </div>
-
-              {passwordChangeMessage && (
-                <div
-                  className={`flex items-center gap-1.5 p-2.5 rounded-lg text-xs font-semibold ${
-                    passwordChangeMessage.success
-                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                      : 'bg-red-50 border border-red-200 text-red-700'
-                  }`}
-                >
-                  {passwordChangeMessage.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  ) : (
-                    <AlertCircle className="w-4 h-4 text-red-500 shrink-0" />
-                  )}
-                  <span>{passwordChangeMessage.text}</span>
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#E6E6E3]">
-                <button
-                  type="button"
-                  onClick={() => setIsPasswordModalOpen(false)}
-                  className="py-2 px-4 rounded-full border border-[#E6E6E3] bg-white hover:bg-zinc-100 text-zinc-700 text-xs font-semibold cursor-pointer"
-                >
-                  Хаах
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={passwordChangeLoading || !currentPasswordInput || !newPasswordInput}
-                  className="py-2 px-5 rounded-full bg-[#141414] hover:bg-black disabled:opacity-50 text-white font-bold text-xs cursor-pointer shadow-xs flex items-center gap-1.5"
-                >
-                  <KeyRound className="w-3.5 h-3.5" />
-                  <span>{passwordChangeLoading ? 'Шинэчилж байна...' : 'Нууц үг хадгалах'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+        </form>
+      </div>
     </div>
+  )
+}
+    </div >
   )
 }
