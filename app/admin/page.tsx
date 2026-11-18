@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import posthog from 'posthog-js'
 import Image from 'next/image'
 import {
   CheckCircle2,
@@ -62,6 +63,12 @@ import {
   FileFormatBadge,
 } from '@/components/store/file-format-badge'
 import type { Order } from '@/lib/orders-db'
+
+const ADMIN_DISTINCT_ID = 'admin'
+
+const identifyAdmin = () => {
+  posthog.identify(ADMIN_DISTINCT_ID, { role: 'admin' })
+}
 
 interface StoreSettingsState {
   storeName: string
@@ -734,6 +741,7 @@ export default function AdminPage() {
           if (data.valid) {
             setPasscode(saved)
             setIsAuthenticated(true)
+            identifyAdmin()
             try {
               sessionStorage.setItem('soniq_admin_passcode', saved)
               localStorage.setItem('soniq_admin_passcode', saved)
@@ -753,6 +761,7 @@ export default function AdminPage() {
         .catch(() => {
           setPasscode(saved)
           setIsAuthenticated(true)
+          identifyAdmin()
           fetchProducts()
           fetchOrders(saved)
           fetchSettings(saved)
@@ -770,6 +779,7 @@ export default function AdminPage() {
       const data = await res.json()
       if (res.ok && data.valid) {
         setIsAuthenticated(true)
+        identifyAdmin()
         try {
           sessionStorage.setItem('soniq_admin_passcode', passcode)
           localStorage.setItem('soniq_admin_passcode', passcode)
@@ -830,7 +840,9 @@ export default function AdminPage() {
   }
 
   const handleLogout = () => {
+    posthog.reset()
     sessionStorage.removeItem('soniq_admin_passcode')
+    localStorage.removeItem('soniq_admin_passcode')
     setIsAuthenticated(false)
     setPasscode('')
   }
@@ -1398,6 +1410,14 @@ export default function AdminPage() {
         throw new Error(data.error || 'Бүтээгдэхүүн хадгалахад алдаа гарлаа.')
       }
 
+      posthog.capture('product_saved', {
+        operation: isEdit ? 'updated' : 'created',
+        product_id: data.product?.id || payload.id,
+        product_category: payload.category,
+        is_bundle: payload.isBundle,
+        is_free: payload.isFree,
+      })
+
       // Optimistic update of UI: immediately show in list and cache
       if (data.product) {
         setProducts((prev) => {
@@ -1460,6 +1480,9 @@ export default function AdminPage() {
       }
 
       if (res.ok && data?.success) {
+        posthog.capture('product_deleted', {
+          product_id: targetIdentifier,
+        })
         fetchProducts(true)
       } else {
         alert(data?.error || 'Бүтээгдэхүүн устгахад алдаа гарлаа.')
@@ -1522,6 +1545,12 @@ export default function AdminPage() {
       const data = await res.json()
       if (data.success) {
         const isEmailSent = Boolean(data.emailResult?.success)
+        posthog.capture('order_approved', {
+          payment_method: selectedOrder.paymentMethod,
+          item_count: selectedOrder.items.length,
+          send_email: sendEmailToggle,
+          email_sent: isEmailSent,
+        })
         setApprovalSuccessInfo({
           orderId: selectedOrder.id,
           emailSent: isEmailSent,
@@ -1613,6 +1642,7 @@ export default function AdminPage() {
       })
       const data = await res.json()
       if (data.success) {
+        posthog.capture('store_settings_saved')
         setSettingsSaved(true)
         setTimeout(() => setSettingsSaved(false), 2500)
       } else {

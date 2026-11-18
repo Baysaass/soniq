@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { sendTelegramOrderNotification } from '@/lib/telegram'
 import { sendOrderCreatedEmail, sendOrderApprovedEmail } from '@/lib/email-service'
+import { logOrderCreated } from '@/lib/posthog-logs'
 
 export async function POST(request: Request) {
   try {
@@ -146,6 +147,12 @@ export async function POST(request: Request) {
     })
 
     const siteUrl = new URL(request.url).origin
+
+    logOrderCreated({
+      isFree,
+      itemCount: enrichedItems.length,
+      paymentMethod: finalPaymentMethod,
+    })
 
     // Dispatch Telegram notification (non-blocking)
     sendTelegramOrderNotification(order, siteUrl).catch((err) => {
