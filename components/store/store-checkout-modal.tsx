@@ -24,6 +24,7 @@ import {
 import { STORE_SETTINGS } from '@/lib/store-data'
 import { useStore } from '@/lib/store-context'
 import { SafeProductImage } from '@/components/store/safe-image'
+import posthog from 'posthog-js'
 
 export function StoreCheckoutModal() {
   const router = useRouter()
@@ -150,6 +151,11 @@ export function StoreCheckoutModal() {
       }
 
       setR2DownloadUrl(data.downloadUrl)
+      posthog.capture('download_started', {
+        delivery_method: 'r2',
+        checkout_type: 'free_download',
+        item_count: itemsToBuy.length,
+      })
       const link = document.createElement('a')
       link.href = data.downloadUrl
       link.download = `${itemsToBuy[0]?.title || 'soniq-free-pack'}.zip`
@@ -210,6 +216,11 @@ export function StoreCheckoutModal() {
         }
 
         clearCart()
+        posthog.capture('free_download_claimed', {
+          item_count: itemsToBuy.length,
+          product_ids: itemsToBuy.map((item) => item.id),
+          currency,
+        })
         const resolvedDrive = (data.weTransferLink ?? data.order?.weTransferLink ?? '')?.trim()
         const resolvedR2 = (data.r2Key ?? data.order?.r2Key ?? '')?.trim()
 
@@ -246,6 +257,13 @@ export function StoreCheckoutModal() {
         }
 
         clearCart()
+        posthog.capture('payment_checkout_started', {
+          payment_method: 'bonum',
+          item_count: itemsToBuy.length,
+          product_ids: itemsToBuy.map((item) => item.id),
+          total_mnt: totalMNT,
+          currency,
+        })
         setIsCheckoutOpen(false)
 
         try {
@@ -284,6 +302,13 @@ export function StoreCheckoutModal() {
       }
 
       clearCart()
+      posthog.capture('manual_transfer_order_created', {
+        payment_method: 'khan_bank',
+        item_count: itemsToBuy.length,
+        product_ids: itemsToBuy.map((item) => item.id),
+        total_mnt: totalMNT,
+        currency,
+      })
       setIsCheckoutOpen(false)
       router.push(`/order/${data.orderId}`)
     } catch (err: unknown) {

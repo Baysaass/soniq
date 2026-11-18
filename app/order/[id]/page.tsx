@@ -25,6 +25,7 @@ import {
 import { InstagramIcon, TelegramIcon } from '@/components/icons/social'
 import { STORE_SETTINGS } from '@/lib/store-data'
 import { SoniqMark, SoniqWordmark } from '@/components/logo'
+import posthog from 'posthog-js'
 
 interface OrderItem {
   id: string
@@ -175,6 +176,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       }
 
       setR2DownloadUrl(data.downloadUrl)
+      posthog.capture('download_started', {
+        delivery_method: 'r2',
+        item_count: order.items.length,
+      })
       // Trigger download in browser
       const link = document.createElement('a')
       link.href = data.downloadUrl
@@ -216,6 +221,11 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       }
 
       setChildR2Urls((prev) => ({ ...prev, [key]: data.downloadUrl }))
+      posthog.capture('download_started', {
+        delivery_method: 'r2',
+        item_count: 1,
+        is_bundle_item: true,
+      })
       const link = document.createElement('a')
       link.href = data.downloadUrl
       link.download = filename
@@ -246,6 +256,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         }),
       })
       if (res.ok) {
+        posthog.capture('order_cancelled', {
+          payment_method: order.paymentMethod,
+          item_count: order.items.length,
+        })
         await fetchOrder()
       }
     } catch (err) {

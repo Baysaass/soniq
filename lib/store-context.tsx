@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { STORE_PRODUCTS, ULTIMATE_BUNDLE, STORE_SETTINGS, StoreProduct, DEFAULT_STORE_CATEGORIES } from './store-data'
 import { audioSynthesizer } from './audio-synthesizer'
+import posthog from 'posthog-js'
 
 export interface CartItem {
   product: StoreProduct
@@ -155,6 +156,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const addToCart = (product: StoreProduct, openDrawer = true) => {
     audioSynthesizer.playUI()
+    posthog.capture('cart_item_added', {
+      product_id: product.id,
+      product_category: product.category,
+      is_free: Boolean(product.isFree || (product.priceMNT === 0 && product.priceUSD === 0)),
+      price_mnt: product.priceMNT,
+      currency: 'MNT',
+    })
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id)
       if (existing) {
@@ -180,6 +188,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const openCheckoutWithProduct = (product: StoreProduct) => {
     audioSynthesizer.playUI()
+    posthog.capture('checkout_opened', {
+      checkout_source: 'product',
+      product_id: product.id,
+      product_category: product.category,
+      is_free: Boolean(product.isFree || (product.priceMNT === 0 && product.priceUSD === 0)),
+      price_mnt: product.priceMNT,
+      currency: 'MNT',
+    })
     setCheckoutTargetProduct(product)
     setIsCheckoutOpen(true)
   }

@@ -4,6 +4,7 @@ import React, { useEffect } from 'react'
 import Image from 'next/image'
 import { X, Trash2, ShoppingBag, ArrowRight, ShieldCheck } from 'lucide-react'
 import { useStore } from '@/lib/store-context'
+import posthog from 'posthog-js'
 
 export function StoreCartDrawer() {
   const {
@@ -32,6 +33,13 @@ export function StoreCartDrawer() {
   if (!isCartOpen) return null
 
   const handleProceedToCheckout = () => {
+    posthog.capture('checkout_opened', {
+      checkout_source: 'cart',
+      item_count: cart.length,
+      product_ids: cart.map((item) => item.product.id),
+      total_mnt: cartTotalMNT,
+      currency: 'MNT',
+    })
     setIsCartOpen(false)
     setIsCheckoutOpen(true)
   }

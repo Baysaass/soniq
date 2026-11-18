@@ -7,6 +7,7 @@ import {
 } from '@/lib/bonum'
 import { sendOrderApprovedEmail } from '@/lib/email-service'
 import { sendTelegramOrderApprovedNotification, sendTelegramMessage } from '@/lib/telegram'
+import { logPaymentApproved } from '@/lib/posthog-logs'
 
 /**
  * GET handler: Allows browser checks, uptime monitors, and portal verification
@@ -191,6 +192,8 @@ export async function POST(request: Request) {
         } catch (tgErr) {
           console.warn('[Bonum Webhook] Telegram alert error:', tgErr)
         }
+
+        logPaymentApproved({ paymentMethod: order.paymentMethod })
 
         return NextResponse.json(
           { success: true, status: 'SUCCESS_APPROVED', orderId: order.id },

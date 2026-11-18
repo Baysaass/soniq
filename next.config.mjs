@@ -1,4 +1,7 @@
 /** @type {import('next').NextConfig} */
+const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST
+const posthogAssetsHost = posthogHost?.replace('.i.posthog.com', '-assets.i.posthog.com')
+
 const securityHeaders = [
   {
     key: 'X-DNS-Prefetch-Control',
@@ -28,12 +31,13 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: `
       default-src 'self';
-      script-src 'self' 'unsafe-eval' 'unsafe-inline';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline' ${posthogAssetsHost ?? ''};
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       img-src 'self' blob: data: https:;
       font-src 'self' https://fonts.gstatic.com data:;
       media-src 'self' blob: data: https:;
-      connect-src 'self' https: wss:;
+      worker-src 'self' blob:;
+      connect-src 'self' https: wss: ${posthogHost ?? ''};
       frame-ancestors 'self';
       form-action 'self';
       base-uri 'self';
