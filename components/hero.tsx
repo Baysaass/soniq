@@ -127,41 +127,102 @@ export function Hero({
           </p>
 
           {/* Two Package Cards */}
-          <FadeUp y={16} delay={0.15} className="mt-10 w-full max-w-md">
-            <div className="grid grid-cols-2 gap-3">
+          <FadeUp y={16} delay={0.15} className="mt-10 w-full max-w-xl">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Starter */}
               <Link
                 href={starterHref}
                 onClick={(e) => {
                   if (onGetClick) onGetClick('starter', e)
                 }}
-                className="group relative flex flex-col items-center gap-1.5 px-4 py-5 rounded-2xl border border-border bg-white hover:border-brand/40 hover:shadow-md hover:shadow-brand/5 transition-all duration-200 cursor-pointer text-center"
+                className="group relative flex flex-col justify-between p-5 rounded-2xl border border-slate-200/90 bg-white hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 transition-all duration-200 cursor-pointer text-center"
               >
-                <span className="text-[11px] font-bold text-muted-foreground/70 uppercase tracking-wider">{t('pkg_starter_name')}</span>
-                <span className="text-[26px] font-bold text-foreground tracking-tight leading-none">{t('pkg_starter_price')}</span>
-                <span className="text-[11px] font-semibold text-brand">{t('pkg_starter_sfx')}</span>
-                <span className="text-[10px] text-muted-foreground mt-1">{t('pkg_starter_desc')}</span>
+                {/* Badge */}
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-bold text-blue-700 shadow-xs uppercase tracking-wide">
+                  {t('pkg_starter_badge')}
+                </span>
+
+                <div className="flex flex-col items-center">
+                  <span className="text-[12px] font-bold text-muted-foreground/80 uppercase tracking-wider mt-1">{t('pkg_starter_name')}</span>
+                  
+                  {/* Price Area */}
+                  <div className="flex flex-col items-center my-2">
+                    <span className="text-[12px] text-muted-foreground line-through decoration-red-400/80 font-medium">
+                      {t('pkg_starter_old_price')}
+                    </span>
+                    <span className="text-[28px] font-black text-emerald-600 tracking-tight leading-none">
+                      {t('pkg_starter_price')}
+                    </span>
+                  </div>
+
+                  <span className="text-[12px] font-semibold text-foreground/90">{t('pkg_starter_sfx')}</span>
+                  <span className="text-[11px] text-muted-foreground mt-1 line-clamp-1">{t('pkg_starter_desc')}</span>
+                </div>
+
+                {/* Action Button */}
+                <div className="w-full mt-4 py-2.5 px-3 rounded-xl bg-slate-900 group-hover:bg-blue-600 text-white text-[12px] font-bold transition-all duration-200 flex items-center justify-center gap-1.5 shadow-sm">
+                  <span>{t('pkg_starter_cta')}</span>
+                </div>
               </Link>
 
-              {/* Full (recommended) */}
+              {/* Full (recommended / Promo) */}
               <Link
                 href={fullHref}
                 onClick={(e) => {
                   if (onGetClick) onGetClick('full', e)
                 }}
-                className="group relative flex flex-col items-center gap-1.5 px-4 py-5 rounded-2xl border-2 border-amber-400/60 bg-gradient-to-b from-amber-50/80 to-white hover:border-amber-400 hover:shadow-md hover:shadow-amber-500/10 transition-all duration-200 cursor-pointer text-center"
+                className="group relative flex flex-col justify-between p-5 rounded-2xl border-2 border-amber-400/80 bg-gradient-to-b from-amber-50/90 via-white to-amber-50/30 hover:border-amber-500 hover:shadow-xl hover:shadow-amber-500/15 transition-all duration-200 cursor-pointer text-center"
               >
                 {/* Badge */}
-                <span className="absolute -top-2.5 px-2.5 py-0.5 rounded-full bg-amber-400 text-[9px] font-bold text-white shadow-sm">
-                  {t('pkg_full_badge')}
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-gradient-to-r from-red-600 via-amber-500 to-amber-600 text-[10px] font-black text-white shadow-md flex items-center gap-1.5 whitespace-nowrap">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                  </span>
+                  <span>{t('pkg_full_badge')}</span>
                 </span>
-                <span className="text-[11px] font-bold text-amber-600/80 uppercase tracking-wider">{t('pkg_full_name')}</span>
-                <span className="text-[26px] font-bold text-foreground tracking-tight leading-none">{t('pkg_full_price')}</span>
-                <span className="text-[11px] font-semibold text-amber-600">{t('pkg_full_sfx')}</span>
-                <span className="text-[10px] text-muted-foreground mt-1">{t('pkg_full_desc')}</span>
+
+                <div className="flex flex-col items-center">
+                  <span className="text-[12px] font-bold text-amber-700 uppercase tracking-wider mt-1">{t('pkg_full_name')}</span>
+
+                  {/* Price Area */}
+                  <div className="flex flex-col items-center my-2">
+                    <span className="text-[12px] text-muted-foreground line-through decoration-red-500/80 font-medium">
+                      {t('pkg_full_old_price')}
+                    </span>
+                    <span className="text-[30px] font-black text-amber-600 tracking-tight leading-none">
+                      {t('pkg_full_price')}
+                    </span>
+                  </div>
+
+                  <span className="text-[12px] font-bold text-amber-700">{t('pkg_full_sfx')}</span>
+                  <span className="text-[11px] text-muted-foreground mt-1 line-clamp-1">{t('pkg_full_desc')}</span>
+                </div>
+
+                {/* Action Button */}
+                <div className="w-full mt-4 py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 group-hover:from-amber-600 group-hover:to-amber-700 text-white text-[12px] font-black transition-all duration-200 flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/25">
+                  <span>{t('pkg_full_cta')}</span>
+                </div>
               </Link>
             </div>
-            <p className="text-[12px] text-muted-foreground/70 mt-3 text-center">{t('hero_note')}</p>
+
+            {/* Promo Announcement Banner */}
+            <div className="mt-4 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-amber-500/15 to-orange-500/10 border border-amber-500/25 text-amber-950 text-[12px] font-medium text-center flex items-center justify-center gap-2 shadow-xs">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+              </span>
+              <span>{t('pkg_promo_banner')}</span>
+            </div>
+
+            {/* Trust & Guarantee info */}
+            <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/80 text-center">
+              <span>🛡️ {t('pkg_onetime')}</span>
+              <span>•</span>
+              <span>⚡ Bonum (QPay & Карт)</span>
+              <span>•</span>
+              <span>📥 Шууд татах эрх</span>
+            </div>
           </FadeUp>
         </div>
 

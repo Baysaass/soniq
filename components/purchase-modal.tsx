@@ -42,8 +42,8 @@ export function PurchaseModal({ isOpen, selectedPlan, onClose }: PurchaseModalPr
   }, [isOpen])
 
   const planLabel = selectedPlan === 'starter' ? 'Starter' : 'Full'
-  const planPrice = selectedPlan === 'starter' ? '29,900₮' : '59,900₮'
-  const planSfx = selectedPlan === 'starter' ? '150+ SFX' : '500+ SFX'
+  const planPrice = selectedPlan === 'starter' ? 'ҮНЭГҮЙ (0₮)' : '54,900₮'
+  const planSfx = selectedPlan === 'starter' ? '150+ SFX · Үнэгүй' : '500+ SFX · Бүрэн эрх'
 
   return (
     <AnimatePresence>
