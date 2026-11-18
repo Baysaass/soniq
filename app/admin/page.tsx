@@ -151,6 +151,7 @@ export default function AdminPage() {
     description: string
     defaultWeTransferLink: string
     r2Key: string
+    priceBasis?: 'original' | 'sale'
   }>({
     id: '',
     slug: '',
@@ -169,6 +170,7 @@ export default function AdminPage() {
     description: '',
     defaultWeTransferLink: '',
     r2Key: '',
+    priceBasis: 'original',
   })
 
   // Orders State
@@ -286,6 +288,25 @@ export default function AdminPage() {
     }
   }
 
+  // Helper to get base / original price of a product (өмнөх үндсэн үнэ)
+  const getProductBaseMNT = (p: Partial<StoreProduct>): number => {
+    const orig = Number(p.originalPriceMNT) || 0
+    if (orig > 0) return orig
+    return Number(p.priceMNT) || 0
+  }
+
+  const getProductBaseUSD = (p: Partial<StoreProduct>, rate: number = 3600): number => {
+    const origUSD = Number(p.originalPriceUSD) || 0
+    if (origUSD > 0) return origUSD
+    const origMNT = Number(p.originalPriceMNT) || 0
+    if (origMNT > 0 && rate > 0) return Number((origMNT / rate).toFixed(2))
+    const priceUSD = Number(p.priceUSD) || 0
+    if (priceUSD > 0) return priceUSD
+    const priceMNT = Number(p.priceMNT) || 0
+    if (priceMNT > 0 && rate > 0) return Number((priceMNT / rate).toFixed(2))
+    return 0
+  }
+
   // Bundle helper state & functions
   const [bundleSearch, setBundleSearch] = useState('')
 
@@ -296,11 +317,11 @@ export default function AdminPage() {
     const updated = exists ? currentList.filter((id) => id !== prodId) : [...currentList, prodId]
 
     const selectedProds = products.filter((p) => updated.includes(p.id) || updated.includes(p.slug))
-    const sumMNT = selectedProds.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
+    const sumMNT = selectedProds.reduce((acc, p) => acc + getProductBaseMNT(p), 0)
     const rate = exchangeRate > 0 ? exchangeRate : 3600
-    const sumUSD = Number((sumMNT / rate).toFixed(2))
+    const sumUSD = selectedProds.reduce((acc, p) => acc + getProductBaseUSD(p, rate), 0)
 
-    const discount = editingProduct.discountPercent || 75
+    const discount = editingProduct.discountPercent || 40
     const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : editingProduct.priceMNT
     const saleUSD = saleMNT ? Number((saleMNT / rate).toFixed(2)) : editingProduct.priceUSD
 
@@ -326,10 +347,10 @@ export default function AdminPage() {
       .map((p) => p.id)
 
     const selectedProds = products.filter((p) => allIds.includes(p.id))
-    const sumMNT = selectedProds.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
+    const sumMNT = selectedProds.reduce((acc, p) => acc + getProductBaseMNT(p), 0)
     const rate = exchangeRate > 0 ? exchangeRate : 3600
-    const sumUSD = Number((sumMNT / rate).toFixed(2))
-    const discount = editingProduct.discountPercent || 80
+    const sumUSD = selectedProds.reduce((acc, p) => acc + getProductBaseUSD(p, rate), 0)
+    const discount = editingProduct.discountPercent || 40
     const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : editingProduct.priceMNT
     const saleUSD = saleMNT ? Number((saleMNT / rate).toFixed(2)) : editingProduct.priceUSD
 
@@ -402,9 +423,9 @@ export default function AdminPage() {
   const openNewBundleStudio = () => {
     const activeNonBundles = products.filter((p) => !p.isBundle)
     const allIds = activeNonBundles.map((p) => p.id)
-    const sumMNT = activeNonBundles.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
     const rate = exchangeRate > 0 ? exchangeRate : 3600
-    const sumUSD = Number((sumMNT / rate).toFixed(2))
+    const sumMNT = activeNonBundles.reduce((acc, p) => acc + getProductBaseMNT(p), 0)
+    const sumUSD = activeNonBundles.reduce((acc, p) => acc + getProductBaseUSD(p, rate), 0)
 
     const discount = 40
     const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : 49900
@@ -429,6 +450,7 @@ export default function AdminPage() {
       description: 'Энэхүү онцлох багцад манай дэлгүүрийн бүх шилдэг бүтээгдэхүүнүүд багтсан бөгөөд худалдан авмагц тус бүрийн файл шууд нээгдэнэ.',
       defaultWeTransferLink: '',
       r2Key: '',
+      priceBasis: 'original',
     })
     setBundleStudioSearch('')
     setBundleStudioError('')
@@ -438,11 +460,13 @@ export default function AdminPage() {
   const openEditBundleStudio = (p: StoreProduct) => {
     const selectedIds = Array.isArray(p.bundleProductIds) ? p.bundleProductIds : []
     const selectedProds = products.filter((item) => selectedIds.includes(item.id) || selectedIds.includes(item.slug))
-    const sumMNT = selectedProds.length > 0
-      ? selectedProds.reduce((acc, item) => acc + (Number(item.priceMNT) || 0), 0)
-      : (p.originalPriceMNT || p.priceMNT)
     const rate = exchangeRate > 0 ? exchangeRate : 3600
-    const sumUSD = Number((sumMNT / rate).toFixed(2))
+    const sumMNT = selectedProds.length > 0
+      ? selectedProds.reduce((acc, item) => acc + getProductBaseMNT(item), 0)
+      : (p.originalPriceMNT || p.priceMNT)
+    const sumUSD = selectedProds.length > 0
+      ? selectedProds.reduce((acc, item) => acc + getProductBaseUSD(item, rate), 0)
+      : (p.originalPriceUSD || p.priceUSD)
     const discount = p.discountPercent || 40
 
     setBundleStudioData({
@@ -463,6 +487,7 @@ export default function AdminPage() {
       description: p.description || '',
       defaultWeTransferLink: p.defaultWeTransferLink || '',
       r2Key: p.r2Key || '',
+      priceBasis: 'original',
     })
     setBundleStudioSearch('')
     setBundleStudioError('')
@@ -475,9 +500,10 @@ export default function AdminPage() {
     const nextIds = exists ? current.filter((id) => id !== prodId) : [...current, prodId]
 
     const selectedProds = products.filter((p) => nextIds.includes(p.id) || nextIds.includes(p.slug))
-    const sumMNT = selectedProds.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
     const rate = exchangeRate > 0 ? exchangeRate : 3600
-    const sumUSD = Number((sumMNT / rate).toFixed(2))
+    const isSaleBasis = bundleStudioData.priceBasis === 'sale'
+    const sumMNT = selectedProds.reduce((acc, p) => acc + (isSaleBasis ? (Number(p.priceMNT) || 0) : getProductBaseMNT(p)), 0)
+    const sumUSD = selectedProds.reduce((acc, p) => acc + (isSaleBasis ? (Number(p.priceUSD) || 0) : getProductBaseUSD(p, rate)), 0)
 
     const discount = bundleStudioData.discountPercent || 40
     const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : 0
@@ -501,9 +527,10 @@ export default function AdminPage() {
     const allNonBundles = products.filter((p) => p.id !== currentId && !p.isBundle)
     const allIds = allNonBundles.map((p) => p.id)
 
-    const sumMNT = allNonBundles.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
     const rate = exchangeRate > 0 ? exchangeRate : 3600
-    const sumUSD = Number((sumMNT / rate).toFixed(2))
+    const isSaleBasis = bundleStudioData.priceBasis === 'sale'
+    const sumMNT = allNonBundles.reduce((acc, p) => acc + (isSaleBasis ? (Number(p.priceMNT) || 0) : getProductBaseMNT(p)), 0)
+    const sumUSD = allNonBundles.reduce((acc, p) => acc + (isSaleBasis ? (Number(p.priceUSD) || 0) : getProductBaseUSD(p, rate)), 0)
 
     const discount = bundleStudioData.discountPercent || 40
     const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : 0
@@ -527,6 +554,29 @@ export default function AdminPage() {
       originalPriceUSD: 0,
       priceMNT: 0,
       priceUSD: 0,
+    })
+  }
+
+  const handleSwitchBundleStudioPriceBasis = (basis: 'original' | 'sale') => {
+    const selectedProds = products.filter((p) =>
+      bundleStudioData.bundleProductIds.includes(p.id) || bundleStudioData.bundleProductIds.includes(p.slug)
+    )
+    const rate = exchangeRate > 0 ? exchangeRate : 3600
+    const isSale = basis === 'sale'
+    const sumMNT = selectedProds.reduce((acc, p) => acc + (isSale ? (Number(p.priceMNT) || 0) : getProductBaseMNT(p)), 0)
+    const sumUSD = selectedProds.reduce((acc, p) => acc + (isSale ? (Number(p.priceUSD) || 0) : getProductBaseUSD(p, rate)), 0)
+
+    const discount = bundleStudioData.discountPercent || 40
+    const saleMNT = sumMNT > 0 ? Math.round((sumMNT * (1 - discount / 100)) / 100) * 100 : 0
+    const saleUSD = Number((saleMNT / rate).toFixed(2))
+
+    setBundleStudioData({
+      ...bundleStudioData,
+      priceBasis: basis,
+      originalPriceMNT: sumMNT,
+      originalPriceUSD: sumUSD,
+      priceMNT: saleMNT,
+      priceUSD: saleUSD,
     })
   }
 
@@ -3542,10 +3592,21 @@ export default function AdminPage() {
                               <div className="text-xs font-bold truncate max-w-[200px]">
                                 {prod.title}
                               </div>
-                              <div className="text-[10px] text-zinc-500 flex items-center gap-1.5 mt-0.5">
-                                <span className="font-mono font-semibold text-zinc-800">
-                                  {Number(prod.priceMNT || 0).toLocaleString()}₮
-                                </span>
+                              <div className="text-[10px] text-zinc-500 flex flex-wrap items-center gap-1.5 mt-0.5">
+                                {Number(prod.originalPriceMNT || 0) > 0 ? (
+                                  <>
+                                    <span className="font-mono font-bold text-amber-800 bg-amber-100/80 px-1.5 py-0.2 rounded border border-amber-300">
+                                      Үндсэн: {Number(prod.originalPriceMNT).toLocaleString()}₮
+                                    </span>
+                                    <span className="font-mono text-zinc-400 line-through">
+                                      Хямдарсан: {Number(prod.priceMNT || 0).toLocaleString()}₮
+                                    </span>
+                                  </>
+                                ) : (
+                                  <span className="font-mono font-semibold text-zinc-800">
+                                    Үндсэн: {Number(prod.priceMNT || 0).toLocaleString()}₮
+                                  </span>
+                                )}
                                 {prod.fileSize && <span>· {prod.fileSize}</span>}
                               </div>
                             </div>
@@ -3575,16 +3636,44 @@ export default function AdminPage() {
 
               {/* SECTION 3: PRICING & AUTO-DISCOUNT ENGINE */}
               <div className="space-y-3 bg-[#FBFBFA] border border-[#E6E6E3] rounded-xl p-4">
-                <div className="text-[11px] font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
-                  <span>3. Үнэ & Хямдралын автомат тооцоо</span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="text-[11px] font-extrabold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <TrendingUp className="w-3.5 h-3.5 text-amber-600" />
+                    <span>3. Үнэ & Хямдралын автомат тооцоо</span>
+                  </div>
+
+                  {/* Basis Switcher */}
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-amber-300 shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchBundleStudioPriceBasis('original')}
+                      className={`px-2 py-0.8 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                        bundleStudioData.priceBasis !== 'sale'
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-zinc-600 hover:text-zinc-950'
+                      }`}
+                    >
+                      ✓ Үндсэн/Хуучин үнээр (Өмнөх үнэ)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSwitchBundleStudioPriceBasis('sale')}
+                      className={`px-2 py-0.8 rounded text-[10px] font-medium transition-all cursor-pointer ${
+                        bundleStudioData.priceBasis === 'sale'
+                          ? 'bg-amber-500 text-white shadow-xs'
+                          : 'text-zinc-500 hover:text-zinc-800'
+                      }`}
+                    >
+                      Хямдарсан үнээр
+                    </button>
+                  </div>
                 </div>
 
                 {/* Original Sum Display */}
                 <div className="p-3 bg-white border border-[#E6E6E3] rounded-xl flex items-center justify-between">
                   <div>
                     <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">
-                      Сонгогдсон ({bundleStudioData.bundleProductIds.length}) бүтээгдэхүүний үндсэн нийлбэр үнэ
+                      Сонгогдсон ({bundleStudioData.bundleProductIds.length}) бүтээгдэхүүний {bundleStudioData.priceBasis === 'sale' ? 'хямдарсан үнийн нийлбэр' : 'өмнөх үндсэн/хуучин үнийн нийлбэр'}
                     </span>
                     <div className="text-lg font-black font-mono text-zinc-900 mt-0.5">
                       {Number(bundleStudioData.originalPriceMNT || 0).toLocaleString()}₮
@@ -3592,6 +3681,11 @@ export default function AdminPage() {
                         (${Number(bundleStudioData.originalPriceUSD || 0).toFixed(2)})
                       </span>
                     </div>
+                    <p className="text-[11px] text-amber-800 font-medium mt-1">
+                      {bundleStudioData.priceBasis === 'sale'
+                        ? 'ℹ️ Бүтээгдэхүүн тус бүрийн одоогийн хямдарсан үнийг нийлүүлж байна.'
+                        : '💡 Бүтээгдэхүүн тус бүрийн хуучин/өмнөх үндсэн үнээр тооцож, түүнээс хямдралыг бодож байна.'}
+                    </p>
                   </div>
 
                   {bundleStudioData.originalPriceMNT > bundleStudioData.priceMNT && (
@@ -4850,9 +4944,20 @@ export default function AdminPage() {
                                 </div>
 
                                 <div className="text-right shrink-0 ml-2">
-                                  <div className="text-xs font-mono font-bold text-zinc-900">
-                                    {Number(p.priceMNT).toLocaleString()}₮
-                                  </div>
+                                  {Number(p.originalPriceMNT || 0) > 0 ? (
+                                    <>
+                                      <div className="text-xs font-mono font-bold text-amber-800">
+                                        Үндсэн: {Number(p.originalPriceMNT).toLocaleString()}₮
+                                      </div>
+                                      <div className="text-[10px] font-mono text-zinc-400 line-through">
+                                        {Number(p.priceMNT).toLocaleString()}₮
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="text-xs font-mono font-bold text-zinc-900">
+                                      Үндсэн: {Number(p.priceMNT).toLocaleString()}₮
+                                    </div>
+                                  )}
                                   <div className="text-[10px] font-mono text-zinc-400">
                                     ${Number(p.priceUSD).toFixed(2)}
                                   </div>
@@ -4868,16 +4973,16 @@ export default function AdminPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 block">
-                            2. Үнийн нэгтгэл & Тооцоолол
+                            2. Үнийн нэгтгэл & Тооцоолол (Өмнөх үндсэн үнээр)
                           </span>
                           <div className="text-xs text-zinc-700 mt-0.5">
-                            Сонгосон бүтээгдэхүүнүүдийн нийлбэр дүн:{' '}
+                            Сонгосон бүтээгдэхүүнүүдийн үндсэн үнийн нийлбэр:{' '}
                             <strong className="text-zinc-950 font-mono">
                               {(() => {
                                 const selected = products.filter(
                                   (p) => (editingProduct.bundleProductIds || []).includes(p.id) || (editingProduct.bundleProductIds || []).includes(p.slug)
                                 )
-                                const sum = selected.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
+                                const sum = selected.reduce((acc, p) => acc + getProductBaseMNT(p), 0)
                                 return sum.toLocaleString()
                               })()}₮
                             </strong>{' '}
@@ -4886,8 +4991,9 @@ export default function AdminPage() {
                                 const selected = products.filter(
                                   (p) => (editingProduct.bundleProductIds || []).includes(p.id) || (editingProduct.bundleProductIds || []).includes(p.slug)
                                 )
-                                const sum = selected.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
-                                return ((sum) / (exchangeRate || 3600)).toFixed(2)
+                                const rate = exchangeRate > 0 ? exchangeRate : 3600
+                                const sum = selected.reduce((acc, p) => acc + getProductBaseUSD(p, rate), 0)
+                                return sum.toFixed(2)
                               })()})
                             </span>
                           </div>
@@ -4899,9 +5005,9 @@ export default function AdminPage() {
                             const selected = products.filter(
                               (p) => (editingProduct.bundleProductIds || []).includes(p.id) || (editingProduct.bundleProductIds || []).includes(p.slug)
                             )
-                            const sumMNT = selected.reduce((acc, p) => acc + (Number(p.priceMNT) || 0), 0)
+                            const sumMNT = selected.reduce((acc, p) => acc + getProductBaseMNT(p), 0)
                             const rate = exchangeRate > 0 ? exchangeRate : 3600
-                            const sumUSD = Number((sumMNT / rate).toFixed(2))
+                            const sumUSD = selected.reduce((acc, p) => acc + getProductBaseUSD(p, rate), 0)
                             setEditingProduct({
                               ...editingProduct,
                               originalPriceMNT: sumMNT,
